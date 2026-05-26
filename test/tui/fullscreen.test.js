@@ -2,7 +2,7 @@ import { EventEmitter } from "node:events";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { setImmediate as tick } from "node:timers/promises";
+import { setTimeout as sleep } from "node:timers/promises";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -64,8 +64,13 @@ describe("tui/launchInteractiveTui fullscreen", () => {
       stdout: /** @type {any} */ (stdout),
       stdin: /** @type {any} */ (stdin),
     });
-    // Let Ink flush its first paint into the (already-entered) alt buffer.
-    await tick();
+    // Let Ink flush its first paint into the (already-entered) alt buffer. A
+    // single microtask is enough locally but not on a loaded CI runner, so poll
+    // (bounded) until the brand actually paints before sampling the stream.
+    const deadline = Date.now() + 2000;
+    while (stdout.data.indexOf("firstpass") === -1 && Date.now() < deadline) {
+      await sleep(10);
+    }
 
     const enter = stdout.data.indexOf(ENTER_ALT);
     const content = stdout.data.indexOf("firstpass"); // the header brand
