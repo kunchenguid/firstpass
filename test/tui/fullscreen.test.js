@@ -64,29 +64,26 @@ describe("tui/launchInteractiveTui fullscreen", () => {
       stdout: /** @type {any} */ (stdout),
       stdin: /** @type {any} */ (stdin),
     });
-    // Let Ink flush its first paint into the (already-entered) alt buffer. A
-    // single microtask is enough locally but not on a loaded CI runner, so poll
-    // (bounded) until the brand actually paints before sampling the stream.
-    const deadline = Date.now() + 2000;
-    while (stdout.data.indexOf("firstpass") === -1 && Date.now() < deadline) {
-      await sleep(10);
-    }
-
-    const enter = stdout.data.indexOf(ENTER_ALT);
-    const content = stdout.data.indexOf("firstpass"); // the header brand
-
-    // The original bug switched buffers from a mounted effect, *after* the first
-    // paint, so the frame went to the normal buffer and the alt screen stayed
-    // blank. The fix enters the alt screen first, so ENTER_ALT precedes content.
-    expect(enter).toBeGreaterThanOrEqual(0);
-    expect(content).toBeGreaterThan(enter);
-
+    // Let the component mount and render at least once, then tear down. We
+    // assert on the FULL stream after teardown rather than mid-flight: Ink only
+    // writes incremental frames in interactive mode - under CI (process.env.CI)
+    // it batches and flushes the frame on unmount, so sampling before unmount
+    // sees no content at all. Byte ordering proves the fix either way.
+    await sleep(50);
     instance.unmount();
     await instance.waitUntilExit();
     restore();
 
-    // On teardown the alt screen is left, after everything that was painted.
+    const enter = stdout.data.indexOf(ENTER_ALT);
+    const content = stdout.data.indexOf("firstpass"); // the header brand
     const leave = stdout.data.indexOf(LEAVE_ALT);
+
+    // The original bug switched buffers from a mounted effect, *after* the first
+    // paint, so the frame went to the normal buffer and the alt screen stayed
+    // blank. The fix enters the alt screen first, so ENTER_ALT precedes the
+    // painted content, and the alt screen is left only after that content.
+    expect(enter).toBeGreaterThanOrEqual(0);
+    expect(content).toBeGreaterThan(enter);
     expect(leave).toBeGreaterThan(content);
   });
 });
