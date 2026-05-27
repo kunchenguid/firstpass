@@ -58,6 +58,28 @@ function printable(input) {
   return typeof input === "string" && input.length === 1 && input >= " ";
 }
 
+function appendActiveTextInput(state, input) {
+  if (state.currentStep === "agent" && state.agentMode === "custom") {
+    return {
+      ...state,
+      customAgent: state.customAgent + input,
+      notice: "",
+    };
+  }
+  if (
+    state.currentStep === "source" &&
+    state.source === "github" &&
+    state.githubScope === "explicit"
+  ) {
+    return {
+      ...state,
+      githubRepoInput: state.githubRepoInput + input,
+      notice: "",
+    };
+  }
+  return null;
+}
+
 function InitWizardApp({ context, initialSelections, onSubmit, onCancel }) {
   const { exit } = useApp();
   const { columns, rows } = useWindowSize();
@@ -83,6 +105,13 @@ function InitWizardApp({ context, initialSelections, onSubmit, onCancel }) {
   }
 
   useInput((input, key) => {
+    if (printable(input)) {
+      const next = appendActiveTextInput(state, input);
+      if (next) {
+        setState(next);
+        return;
+      }
+    }
     if (input === "q") {
       finishCancel();
       return;
@@ -155,29 +184,6 @@ function InitWizardApp({ context, initialSelections, onSubmit, onCancel }) {
         notice: "",
       });
       return;
-    }
-    if (printable(input)) {
-      setState((current) => {
-        if (current.currentStep === "agent" && current.agentMode === "custom") {
-          return {
-            ...current,
-            customAgent: current.customAgent + input,
-            notice: "",
-          };
-        }
-        if (
-          current.currentStep === "source" &&
-          current.source === "github" &&
-          current.githubScope === "explicit"
-        ) {
-          return {
-            ...current,
-            githubRepoInput: current.githubRepoInput + input,
-            notice: "",
-          };
-        }
-        return current;
-      });
     }
   });
 
