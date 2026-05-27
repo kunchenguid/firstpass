@@ -340,8 +340,9 @@ export function buildInboxModel(
   };
 }
 
-// Plain-string fallback used for non-TTY output and tests. Mirrors the rich
-// view's information, line for line, from the same model.
+// Plain-string fallback used for non-TTY output and tests. It uses the same
+// model as the rich view, but stays a static summary instead of documenting or
+// drawing interactive-only affordances like WILL DO scrolling.
 export function renderInboxView(db, opts = {}) {
   const model = buildInboxModel(db, opts);
   const lines = [];
@@ -381,7 +382,7 @@ export function renderInboxView(db, opts = {}) {
   }
   lines.push(RULE);
   lines.push(
-    "Actions: ↑/↓ move · 1-9 select · j/k scroll WILL DO · a approve · d dismiss · s snooze · r refresh · q quit",
+    "Actions: ↑/↓ move · 1-9 select · a approve · d dismiss · s snooze · r refresh · q quit",
   );
   lines.push(RULE);
 

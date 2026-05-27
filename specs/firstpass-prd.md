@@ -124,13 +124,17 @@ A configured plugin is the unit of scope; there is no separate source-account ob
 ### Inbox And Detail
 
 The default UI is a review queue.
-Each row shows source, item type, sender or actor, title or subject, recommendation state, waiting state, and freshness.
+Each row uses two lines: the item title, then plugin-owned source context from `metadata.display_handle` or a humanized `item_type`, relative age, badges, and only non-default waiting states.
+Urgency is indicated by marker color, not by changing the row shape.
 After more plugins exist, the queue can contain rows like:
 
 ```text
-gmail/work     email_thread   alice@example.com     Reply: contract draft          action recommended
-github/oss     pull_request   contributor42         Fix failing Windows test       fix suggested
-x/personal     reply          @person               Clarify your post on agents    draft reply
+● Reply: contract draft
+  alice@example.com · contract draft · 2h
+● Fix failing Windows test
+  owner/repo · PR #123 · 1d  [contrib]
+● Clarify your post on agents
+  reply · 4h
 ```
 
 The detail pane shows normalized item metadata, plugin-rendered source context, agent rationale grounded in visible context, ordered recommendation options, proposed actions, action preview and safety warnings, token usage and model, and plugin execution status.
