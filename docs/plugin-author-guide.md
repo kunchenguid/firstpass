@@ -15,19 +15,19 @@ Nonzero exit codes are treated as transport or plugin process failures.
 
 Supported commands are:
 
-| Command           | Purpose                                                                                                 |
-| ----------------- | ------------------------------------------------------------------------------------------------------- |
-| `manifest`        | Return source identity, trust metadata, requested scopes, capabilities, item types, and action catalog. |
-| `doctor`          | Report local readiness checks and warnings.                                                             |
-| `configure`       | Resolve source credentials and return the plugin's derived display name.                                |
-| `sync`            | Return recent item events, fingerprint progress, and sync status.                                       |
-| `fetch`           | Return full human and agent context plus evidence references for one item.                              |
-| `validate-action` | Check whether a proposed action payload is well formed, permitted, and still applicable.                |
-| `preview-action`  | Return the human-readable effect of a proposed action before approval.                                  |
-| `execute-action`  | Execute one approved action with an approval id and idempotency key.                                    |
-| `prepare-automation-workspace` | Prepare a source-owned workspace for an approved automation job.                           |
-| `submit-automation-workspace`  | Submit workspace changes for an approved automation job.                                |
-| `detect-automation-pr` | Re-detect a pull request for a submitted automation job when initial detection was delayed.        |
+| Command                        | Purpose                                                                                                 |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `manifest`                     | Return source identity, trust metadata, requested scopes, capabilities, item types, and action catalog. |
+| `doctor`                       | Report local readiness checks and warnings.                                                             |
+| `configure`                    | Resolve source credentials and return the plugin's derived display name.                                |
+| `sync`                         | Return recent item events, fingerprint progress, and sync status.                                       |
+| `fetch`                        | Return full human and agent context plus evidence references for one item.                              |
+| `validate-action`              | Check whether a proposed action payload is well formed, permitted, and still applicable.                |
+| `preview-action`               | Return the human-readable effect of a proposed action before approval.                                  |
+| `execute-action`               | Execute one approved action with an approval id and idempotency key.                                    |
+| `prepare-automation-workspace` | Prepare a source-owned workspace for an approved automation job.                                        |
+| `submit-automation-workspace`  | Submit workspace changes for an approved automation job.                                                |
+| `detect-automation-pr`         | Re-detect a pull request for a submitted automation job when initial detection was delayed.             |
 
 ## Manifest
 
@@ -36,20 +36,20 @@ Keep it accurate because FirstPass stores it and uses it to validate recommendat
 
 Protocol-required top-level fields are:
 
-| Field              | Meaning                                                                       |
-| ------------------ | ----------------------------------------------------------------------------- |
-| `protocol_version` | The protocol version returned by the plugin, currently `firstpass.plugin.v2`. |
+| Field              | Meaning                                                                         |
+| ------------------ | ------------------------------------------------------------------------------- |
+| `protocol_version` | The protocol version returned by the plugin, currently `firstpass.plugin.v2`.   |
 | `plugin`           | Object with `id`, `version`, optional `display_name`, and optional `publisher`. |
 
 Recommended top-level metadata fields are:
 
 | Field              | Meaning                                                               |
 | ------------------ | --------------------------------------------------------------------- |
-| `trust`            | Distribution and provenance metadata.                                         |
-| `requested_scopes` | Array of source credential scopes and human-readable purposes.                |
-| `capabilities`     | Array of declared capability metadata.                                        |
-| `item_types`       | Source item type ids and display names.                                       |
-| `action_types`     | Action catalog available to agent recommendations and approval flows.         |
+| `trust`            | Distribution and provenance metadata.                                 |
+| `requested_scopes` | Array of source credential scopes and human-readable purposes.        |
+| `capabilities`     | Array of declared capability metadata.                                |
+| `item_types`       | Source item type ids and display names.                               |
+| `action_types`     | Action catalog available to agent recommendations and approval flows. |
 
 Example:
 
@@ -126,13 +126,13 @@ The core saves returned fingerprints only after events and warnings are durably 
 
 `sync` status values are:
 
-| Status              | Meaning                                                                                                |
-| ------------------- | ------------------------------------------------------------------------------------------------------ |
-| `complete`          | The returned fingerprints cover all known source activity for the request window.                      |
-| `partial`           | The core should persist the response, save fingerprints, and immediately sync again.                   |
-| `rate_limited`      | The core should persist returned data and wait at least `retry_after_seconds` before retrying.         |
-| `permission_denied` | Credentials are missing or insufficient and the plugin should be marked unhealthy.                     |
-| `error`             | Sync failed and the plugin should be marked unhealthy with the returned warning.                       |
+| Status              | Meaning                                                                                        |
+| ------------------- | ---------------------------------------------------------------------------------------------- |
+| `complete`          | The returned fingerprints cover all known source activity for the request window.              |
+| `partial`           | The core should persist the response, save fingerprints, and immediately sync again.           |
+| `rate_limited`      | The core should persist returned data and wait at least `retry_after_seconds` before retrying. |
+| `permission_denied` | Credentials are missing or insufficient and the plugin should be marked unhealthy.             |
+| `error`             | Sync failed and the plugin should be marked unhealthy with the returned warning.               |
 
 Events should use stable `external_id` values that can be inserted idempotently.
 Item events should include source-owned activity watermarks and payloads with enough detail for core projections.
