@@ -1,6 +1,6 @@
 # FirstPass Release Guide
 
-This guide covers the first release path for installing FirstPass, configuring local state, trusting plugins, handling credentials, setting retention policy, choosing ACP targets, and running the first GitHub workflow.
+This guide covers the first release path for installing FirstPass, configuring local state, installing plugins, handling credentials, setting retention policy, choosing ACP targets, and running the first GitHub workflow.
 FirstPass is local-first: source data, recommendations, approvals, action receipts, and audit history are stored under the configured state directory unless explicitly exported.
 
 ## Install
@@ -39,7 +39,7 @@ firstpass status
 ```
 
 By default, FirstPass reads configuration from `~/.firstpass/config.yaml` and stores local state under the configured state directory.
-The status command reports configured state, installed plugins, source account health, ACP target disclosure, token usage summaries, and recent action failures.
+The status command reports configured state, agent target and source, installed plugin sync health, local item counts, queue counts, and audit event count.
 
 Example minimal config:
 
@@ -122,7 +122,7 @@ FirstPass can route recommendation generation to an ACP-compatible target when c
 Hosted model targets should be treated as data-sharing boundaries because prompt context can include source-derived content.
 
 Use `firstpass status` to verify the currently configured ACP target and hosted-model disclosure before running triage.
-For sensitive source accounts, disable agent processing in config so items can sync without prompt-context generation:
+For sensitive sources, disable agent processing in config so items can sync without prompt-context generation:
 
 ```yaml
 sources:

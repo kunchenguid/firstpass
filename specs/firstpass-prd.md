@@ -477,7 +477,7 @@ Default sorting is deterministic:
 1. Items with plugin `priority_hint: "urgent"` first.
 2. Items whose snooze just expired before ordinary active items.
 3. Newer `activity_at` before older `activity_at`.
-4. Stable source-account order from config as the final tie-breaker.
+4. Stable configured-plugin order as the final tie-breaker.
 
 MVP does not infer rules from repeated dismissals.
 It may show lightweight suggestions such as “you dismissed several Dependabot items,” but applying a rule is always explicit.
@@ -627,7 +627,7 @@ Users should be able to inspect one recommendation and see the exact prompt cont
 | Plugin security is weaker than a sandboxed permission model.                         | Persist manifest metadata, document credential risks clearly, install only trusted plugins, and explore sandboxing, signed plugins, and permission prompts later.                       |
 | Prompt context can become too large for long email threads or large PRs.             | Prefer plugin-rendered prompt context over raw full history.                                                                                                                              |
 | Prompt context can leave the machine through hosted ACP targets.                     | Show ACP target disclosure during setup, persist prompt retention controls, and let sensitive accounts disable agent processing.                                                          |
-| Cross-source prioritization may require user-specific policy that is hard to infer.  | Keep MVP sorting simple and deterministic: plugin urgency hint, snooze expiry, recency, then source-account order.                                                                        |
+| Cross-source prioritization may require user-specific policy that is hard to infer.  | Keep MVP sorting simple and deterministic: plugin urgency hint, snooze expiry, recency, then configured-plugin order.                                                                     |
 | Public writes and destructive actions have high reputation or durability risk.       | Treat them as high-friction approvals.                                                                                                                                                    |
 | First-party plugin behavior may drift from the protocol.                             | Use recorded fixtures and strict contract tests.                                                                                                                                          |
 
