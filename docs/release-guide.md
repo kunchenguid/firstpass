@@ -72,15 +72,13 @@ firstpass plugin list
 firstpass plugin doctor
 ```
 
-Install a discovered plugin only after reviewing the trust disclosure:
+Install a discovered plugin:
 
 ```sh
 firstpass plugin add <plugin-id>
-firstpass plugin add <plugin-id> --trust
 ```
 
-Trust prompts disclose publisher metadata, distribution metadata, requested scopes, action capabilities, and the binary path.
-FirstPass records the trusted manifest and reports drift through `firstpass plugin doctor` when publisher, version, scopes, capabilities, action catalog, or binary path metadata changes.
+`firstpass plugin doctor` health-checks installed plugins.
 
 ## Credentials
 
@@ -91,7 +89,7 @@ When adding a source account, follow the plugin disclosure and credential guidan
 
 ```sh
 firstpass source add <plugin-id>
-firstpass source add <plugin-id> --account <account-name> --trust
+firstpass source add <plugin-id> --account <account-name>
 ```
 
 Use the narrowest credential scope that supports the workflow you need.
@@ -146,8 +144,8 @@ The first GitHub workflow is intentionally approval-first.
 FirstPass can sync GitHub items, generate local recommendations, preview actions, and execute only after explicit approval.
 
 1. Ensure GitHub credentials are available through the GitHub plugin's supported credential path.
-2. Install and trust the GitHub plugin.
-3. Add the GitHub source account.
+2. Install the GitHub plugin.
+3. Configure the GitHub source.
 4. Run a one-shot sync.
 5. Review the queue.
 6. Triage an item.
@@ -158,13 +156,11 @@ FirstPass can sync GitHub items, generate local recommendations, preview actions
 Commands:
 
 ```sh
-firstpass plugin add github --trust
-firstpass source add github \
-  --account work \
-  --trust \
+firstpass plugin add github
+firstpass plugin configure github \
   --config username=<github-login> \
   --config explicit_repos=<owner>/<repo>
-firstpass source sync <source-account-id>
+firstpass sync
 firstpass list
 firstpass view <item-id>
 firstpass triage <item-id>

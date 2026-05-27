@@ -49,7 +49,7 @@ The bundled `mock` plugin produces a deterministic item with no external side ef
 
 ```sh
 $ firstpass init                      # create ~/.firstpass and the database
-$ firstpass plugin add mock --trust   # install a side-effect-free source
+$ firstpass plugin add mock           # install a side-effect-free source
 $ firstpass daemon start              # the sole worker: syncs, triages, acts
 $ firstpass sync                      # nudge an immediate sync + triage
 $ firstpass list                      # the AI-triaged inbox, with recommendation ids
@@ -147,7 +147,6 @@ The daemon is the only worker. It owns sync, triage, action execution, and autom
 | `approve`                  | `--confirm-destructive` | Confirm destructive actions            |
 | `rerun`                    | `--instructions <text>` | Extra instructions for the agent       |
 | `plugin add` / `configure` | `--config <k=v...>`     | Set plugin configuration pairs         |
-| `plugin add`               | `--trust`               | Trust and install the plugin           |
 | `daemon run`               | `--once`                | Process the queue once and exit        |
 | `update`                   | `--check`               | Only check the registry; never install |
 
@@ -159,7 +158,7 @@ The bundled GitHub plugin syncs issues and pull requests through `gh`, and suppo
 
 ```sh
 gh auth status || gh auth login
-firstpass plugin add github --trust
+firstpass plugin add github
 firstpass plugin configure github \
   --config username=<github-login> \
   --config explicit_repos=<owner>/<repo>
