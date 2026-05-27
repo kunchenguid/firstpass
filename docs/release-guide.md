@@ -85,7 +85,7 @@ firstpass plugin add <plugin-id>
 Core FirstPass config should not contain source secrets.
 Prefer source-owned credential stores such as a source CLI, OAuth token store, OS keychain, or plugin-owned encrypted credential file.
 
-When configuring a source plugin, follow the plugin disclosure and credential guidance:
+When configuring a source plugin, choose trusted bundled plugins and credential paths:
 
 ```sh
 firstpass plugin add <plugin-id>
@@ -113,8 +113,8 @@ firstpass state export > firstpass-state.json
 firstpass state import firstpass-state.json
 ```
 
-State export redacts source-account secrets and raw custom ACP command strings.
-Imported source accounts are marked for reconfiguration because redacted exports do not contain usable credentials.
+State export includes installed plugin identities and redacts plugin config secrets and raw custom ACP command strings.
+Imported bundled plugins are reinstalled with redacted config values, so credentials must be supplied again when needed.
 
 ## ACP Targets
 

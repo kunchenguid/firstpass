@@ -271,7 +271,7 @@ The approval boundary protects users from agent-selected actions executed by hon
 
 MVP must document that tradeoff instead of pretending it is solved by the protocol.
 This is not sandbox enforcement.
-Plugin manifests persist the plugin binary path, resolved version, manifest publisher, requested source scopes, declared capabilities, action safety levels, and install source.
+Plugin records persist the binary path, resolved version, and full manifest metadata, including publisher, requested source scopes, declared capabilities, and action safety levels.
 First-party plugins can be marked as bundled or verified, but their manifests still include source scopes and write-capable actions.
 
 The product should educate users to prefer the narrowest practical source credentials, inspect OAuth scopes before authorizing a plugin, avoid untrusted third-party plugins for sensitive accounts, and disable write scopes if they only want read-only recommendations.
@@ -589,7 +589,7 @@ Adding it usually means choosing and shipping SQLCipher or an equivalent encrypt
 The MVP should document that local data is stored in the user's filesystem under `~/.firstpass`, recommend full-disk encryption for sensitive machines, and leave database encryption as a later opt-in feature unless Gmail or enterprise use makes it a hard requirement.
 
 Backup and portability should start with local export/import, not hosted backup.
-V1 should provide an explicit export of local state, plugin manifests, source-account configuration without secrets, retention policies, and audit history.
+V1 should provide an explicit export of local state, installed plugin identities, plugin configuration without secrets, retention policies, and audit history.
 Hosted backup can come later as an optional encrypted convenience layer and must not become required for normal local operation.
 
 Polling is the only required sync mechanism through MVP and V1.
