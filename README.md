@@ -76,6 +76,8 @@ $ firstpass approve <recommendation-id> --confirm
 ```
 
 Run `firstpass` with no arguments in a terminal to open the live interactive inbox instead.
+Use ↑/↓ to move between items, press `1`-`9` to select an option, review the WILL DO detail, then press `a` to approve the selected option.
+Use `j`/`k` to scroll long WILL DO details.
 Press `i` for queue details, startup help, and other inbox info; press `i` or Esc to return.
 
 ## Install

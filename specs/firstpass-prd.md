@@ -309,6 +309,7 @@ Fingerprints are committed only after the core has durably persisted every retur
 `sync` input fields are the plugin's scope `config` and prior `fingerprints`; there is no `account_id`.
 `sync` output fields are `status`, `events`, next `fingerprints`, optional `has_more`, optional `retry_after_seconds`, and `warnings`.
 Each event includes `external_id`, `lifecycle`, source item fields such as `item_type`, `title`, `actor`, `state`, `url`, `activity_at`, `activity_id`, `fingerprint`, optional `attention`, opaque `payload`, optional `occurred_at`, and optional `metadata`.
+Event `metadata.display_handle` is an optional plugin-owned label for inbox rows; when absent, the UI falls back to the humanized `item_type`.
 The `attention` object includes `should_surface`, `reason`, `waiting_on`, and optional `priority_hint`.
 
 `status` is one of `complete`, `partial`, `rate_limited`, `permission_denied`, or `error`.

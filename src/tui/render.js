@@ -381,7 +381,7 @@ export function renderInboxView(db, opts = {}) {
   }
   lines.push(RULE);
   lines.push(
-    "Actions: ↑/↓ select · a approve · d dismiss · s snooze · r refresh · q quit",
+    "Actions: ↑/↓ move · 1-9 select · j/k scroll WILL DO · a approve · d dismiss · s snooze · r refresh · q quit",
   );
   lines.push(RULE);
 
