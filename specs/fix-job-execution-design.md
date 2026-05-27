@@ -1,8 +1,8 @@
 # Fix-Job Execution Design
 
-Status: draft for review.
-Scope: turn firstpass's queued automation jobs into real coding-agent runs that produce a draft pull request, closing the biggest functional gap versus `ezoss`.
-This document maps the work onto the existing jobs table, plugin protocol, and ACP runtime before any code is written.
+Status: implemented architecture note.
+Scope: explain how firstpass turns queued automation jobs into coding-agent runs that produce a draft pull request.
+This document maps the implemented work onto the jobs table, plugin protocol, and ACP runtime.
 
 ## Goal And Non-Goals
 
@@ -16,15 +16,15 @@ This document maps the work onto the existing jobs table, plugin protocol, and A
 
 ## Current State (grounded)
 
-Jobs are only ever queued, never run.
+Fix jobs are queued by approvals, executed by daemon effects, and inspected through job commands.
 
-- The `jobs` table already exists with the right shape: `id, item_id, recommendation_id, option_id, kind, status, phase, prompt, metadata_json, error, created_at, started_at, updated_at, completed_at` (`src/database.js:176`).
-- On approval, an option's `automation: { kind, prompt }` inserts one row with `status: "queued"`, `phase: "pending"`, `prompt`, `metadata_json: "{}"` (`src/cli.js:6249-6287`).
-- `getAutomationJobStatus` / `listAutomationJobs` read jobs for `status` and the `firstpass job list` command (`src/cli.js:1979-2025`).
-- There is no code that claims a queued job, runs anything, or transitions its phase. Grep for a runner finds none.
-- The ACP runtime entrypoint `runAcpRuntimeTurn` runs a turn with `cwd: process.cwd()` (`src/cli.js:3726-3743`); it is not yet parameterized by a working directory.
+- The `jobs` table stores queued, running, succeeded, and failed automation jobs with phase, prompt, metadata, and timestamps.
+- On approval, an option's `automation: { kind, prompt }` inserts a queued job and schedules the daemon effect.
+- The fix-job effect runner in `src/host/effects.js` prepares the plugin workspace, runs the ACP coding agent in that workspace, submits the workspace, and records phase transitions.
+- `firstpass job attach` can re-check a waiting job when PR detection was delayed.
+- The ACP runtime accepts a working directory so fix jobs run inside the prepared workspace rather than the caller's current directory.
 
-So the data model and the queueing half exist; the execution half is missing entirely.
+So the data model, queueing path, execution path, and PR re-detection path are implemented.
 
 ## Responsibility Split
 
@@ -39,11 +39,11 @@ Fix-job execution keeps that boundary.
 | Commit, push, open a draft PR                             | Plugin             | git write semantics and PR creation are source-specific. |
 | Persist phase, result, audit                              | Core               | Core owns the durable record and audit trail.            |
 
-This means two new plugin protocol commands and one new daemon stage.
+This uses plugin protocol commands implemented by the daemon effect runner.
 
-## New Plugin Protocol Commands
+## Plugin Protocol Commands
 
-Both follow the existing JSON-stdin/JSON-stdout convention and are declared in the manifest `capabilities` block so the core only offers fix jobs for plugins that support them.
+These follow the existing JSON-stdin/JSON-stdout convention and are declared in the manifest `capabilities` block so the core only offers fix jobs for plugins that support them.
 
 ### `prepare-automation-workspace`
 
@@ -62,7 +62,15 @@ The plugin stages and commits any agent changes, pushes the branch, and opens a 
 It must be idempotent on `idempotency_key` (re-running a submit for the same job must not open a second PR) and must verify the branch actually has commits ahead of `base_ref` before pushing.
 `status` is `submitted`, `no_changes`, `waiting_for_pr`, or `failed`.
 
-Both commands are `external_write`/`destructive`-class operations; the manifest declares that, and the UI treats them like any other source-visible write.
+### `detect-pr`
+
+Input: `{ config, repository, branch }`.
+Output: `{ status, pr_url, warnings, error }`.
+
+The plugin re-checks whether an asynchronously created PR is now available for a job that returned `waiting_for_pr`.
+`status` is `submitted`, `waiting_for_pr`, or `failed`.
+
+Workspace submit commands are `external_write`/`destructive`-class operations; the manifest declares that, and the UI treats them like any other source-visible write.
 
 ## Job State Machine
 
@@ -83,29 +91,29 @@ A stale-job sweep re-queues `running` jobs whose `updated_at` is older than a ti
 
 ## Daemon Job Stage
 
-Add a Stage C to `runOneShotDaemonSync` after the triage pass (`src/cli.js:3286+`), gated like triage on a resolved agent (`resolveEffectiveAgentSpec`, already added in PR1).
+The daemon effect runner handles fix jobs after approvals enqueue them.
 
 Per cycle:
 
-1. Reclaim stale `running` jobs back to `queued`.
-2. Claim at most one `queued` job (bounded, to keep cycles short and writes deliberate).
-3. `prepare-automation-workspace` via the item's plugin -> `preparing_workspace`.
-4. Run the ACP coding agent in `workspace_path` with the job `prompt` (augmented: "the working copy is at X; make the change; do not open the PR yourself") -> `running_agent`.
-5. `submit-automation-workspace` -> `submitting` -> `pr_opened` / `no_changes`.
-6. Persist phase, `pr_url`, and the agent run record at each transition; emit IPC/daemon-event updates.
+1. Claim queued fix-job work from the event queue.
+2. `prepare-automation-workspace` via the item's plugin -> `preparing_workspace`.
+3. Run the ACP coding agent in `workspace_path` with the job prompt -> `running_agent`.
+4. `submit-automation-workspace` -> `submitting` -> `pr_opened`, `no_changes`, or `waiting_for_pr`.
+5. Persist phase, `pr_url`, and metadata at each transition through job events.
+6. Use `firstpass job attach` / `detect-pr` to close a `waiting_for_pr` job after delayed PR creation.
 
-One job per cycle keeps remote writes paced and observable, and means the existing per-cycle daemon event can carry job progress without a new flooding concern (same lesson as PR2).
+Queue-backed execution keeps remote writes paced and observable while preserving the same event-driven projection model as triage and actions.
 
 ## ACP Runtime Changes
 
-`runAcpRuntimeTurn` (`src/cli.js:3707`) and `createAcpRuntimeContext` (`src/cli.js:3515`) need a `cwd` parameter so a fix job runs the agent inside the prepared workspace instead of `process.cwd()`.
-Triage keeps passing `process.cwd()`; the job stage passes `workspace_path`.
+The ACP runtime receives a `cwd` parameter so a fix job runs the agent inside the prepared workspace instead of `process.cwd()`.
+Triage keeps using the normal process working directory; fix jobs pass `workspace_path`.
 The agent for a fix job is the same resolved agent spec (auto-detected `acp:claude` etc.), and we reuse persistent sessions keyed by job id.
 Usage and token accounting flow through the existing `agent_runs` plumbing, with a `recommendation_id` already on the job row.
 
 ## Approval And Safety Boundary
 
-The human-approval boundary is satisfied at queue time: a job only exists because the user approved an option whose `automation` block created it (`src/cli.js:6249`).
+The human-approval boundary is satisfied at queue time: a job only exists because the user approved an option whose `automation` block created it.
 The job's remote effect is constrained to a **draft** PR, which is reviewable and reversible, not a merge or a comment to another person.
 
 Open decision: whether opening the draft PR needs a second explicit confirmation, or whether approval-at-queue-time plus draft-only is sufficient.

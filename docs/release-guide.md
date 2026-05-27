@@ -5,7 +5,7 @@ FirstPass is local-first: source data, recommendations, approvals, action receip
 
 ## Install
 
-FirstPass requires Node.js 20 or newer.
+FirstPass requires Node.js 22.13 or newer.
 The package exposes the `firstpass` binary.
 
 For a published release, install it globally:
@@ -26,7 +26,7 @@ For local development before publishing, use the repository scripts instead:
 ```sh
 pnpm install
 pnpm run build
-node src/cli.js status
+node src/cli/index.js status
 ```
 
 ## Initial Setup

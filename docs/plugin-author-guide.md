@@ -2,7 +2,7 @@
 
 FirstPass source plugins are ordinary executables that speak a small JSON protocol over stdin and stdout.
 The core owns local storage, triage lifecycle, approval, and audit.
-Plugins own source-specific authentication, sync semantics, context rendering, action validation, previews, execution, and source URLs.
+Plugins own source-specific authentication, sync semantics, fetched context, action validation, previews, execution, and source URLs.
 
 ## Executable Contract
 
@@ -22,11 +22,12 @@ Supported commands are:
 | `configure`       | Resolve source credentials and return the plugin's derived display name.                                |
 | `sync`            | Return recent item events, fingerprint progress, and sync status.                                       |
 | `fetch`           | Return full human and agent context plus evidence references for one item.                              |
-| `render`          | Return compact Markdown context for human item detail views.                                            |
 | `validate-action` | Check whether a proposed action payload is well formed, permitted, and still applicable.                |
 | `preview-action`  | Return the human-readable effect of a proposed action before approval.                                  |
 | `execute-action`  | Execute one approved action with an approval id and idempotency key.                                    |
-| `open-url`        | Return the native source URL for one item.                                                              |
+| `prepare-automation-workspace` | Prepare a source-owned workspace for an approved automation job.                           |
+| `submit-automation-workspace`  | Submit workspace changes for an approved automation job.                                |
+| `detect-pr`       | Re-detect a pull request for a submitted automation job when initial detection was delayed.              |
 
 ## Manifest
 
@@ -71,7 +72,7 @@ Example:
       "purpose": "Create approved replies or private notes after explicit user approval."
     }
   ],
-  "capabilities": ["sync", "fetch_context", "render_context", "validate_action", "preview_action", "execute_action", "open_url"],
+  "capabilities": ["sync", "fetch", "actions", "automation"],
   "item_types": [{ "type": "ticket", "display_name": "Ticket" }],
   "action_types": [
     {
@@ -140,9 +141,6 @@ Separate compact human context from agent context so the UI can stay readable wh
 Evidence ids should be stable inside one fetched context and should point at events, snippets, attachments, related objects, source URLs, or local files.
 Recommendations cite evidence ids rather than embedding source text repeatedly.
 
-`render` returns Markdown for the detail view.
-Keep it concise and avoid leaking secrets that are not needed for human review.
-
 ## Actions And Safety Levels
 
 Each action type declares a strict JSON Schema, safety level, idempotency behavior, and prompt examples.
@@ -157,7 +155,7 @@ Safety levels are:
 | `external_write` | Sends text or visible interaction to other people.                           |
 | `destructive`    | Closes, deletes, blocks, merges, or otherwise changes durable shared state.  |
 
-The core passes the plugin's scope `config` (never an `account_id`) to `fetch`, `render`, `open-url`, `validate-action`, `preview-action`, `execute-action`, and the automation-workspace commands; plugins that only need the external tool's own auth may ignore it.
+The core passes the plugin's scope `config` (never an `account_id`) to `fetch`, `validate-action`, `preview-action`, `execute-action`, and the automation-workspace commands; plugins that only need the external tool's own auth may ignore it.
 `validate-action` must reject malformed payloads and should warn when source state changed since recommendation time.
 `preview-action` should show the exact outgoing text or source effect before approval.
 `execute-action` receives an `approval_id` and `idempotency_key` and should return `succeeded`, `failed`, or `already_applied`.

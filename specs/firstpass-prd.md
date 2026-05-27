@@ -220,7 +220,7 @@ Responsibilities:
 
 | Area               | Choice                                                                                          |
 | ------------------ | ----------------------------------------------------------------------------------------------- |
-| Runtime            | Node.js 20+ or 22+.                                                                             |
+| Runtime            | Node.js 22.13+.                                                                                 |
 | Source language    | Plain ESM JavaScript.                                                                           |
 | Typechecking       | `tsc --noEmit` with `allowJs` and `checkJs`; no JSDoc type annotations in implementation files. |
 | Package manager    | `pnpm` for development; published package works with `npm install -g firstpass`.                |
@@ -252,11 +252,12 @@ firstpass-src-github doctor
 firstpass-src-github configure
 firstpass-src-github sync
 firstpass-src-github fetch
-firstpass-src-github render
 firstpass-src-github validate-action
 firstpass-src-github preview-action
 firstpass-src-github execute-action
-firstpass-src-github open-url
+firstpass-src-github prepare-automation-workspace
+firstpass-src-github submit-automation-workspace
+firstpass-src-github detect-pr
 ```
 
 Plugin executable names must follow the `firstpass-src-xyz` convention.
@@ -669,7 +670,7 @@ Phase 0: Project skeleton and protocol proof
 - [x] Add config loading for `~/.firstpass/config.yaml`, state directory creation, and snake_case config validation.
 - [x] Add the SQLite connection, migration runner, and initial schema for plugins, configured plugins, items, events, and fingerprints.
 - [x] Define runtime validators for plugin manifests, sync responses, fetch responses, recommendations, and action results.
-- [x] Build the mock source plugin executable with manifest, configure, sync, fetch, validate-action, preview-action, execute-action, and open-url commands.
+- [x] Build the mock source plugin executable with manifest, configure, sync, fetch, validate-action, preview-action, execute-action, automation-workspace, and PR-detection commands.
 - [x] Add e2e harness utilities for temporary state directories, mocked source plugins, mocked ACP targets, and built CLI execution.
 - [x] Implement `firstpass init`, `firstpass status`, `firstpass plugin list`, and `firstpass plugin list` against real local state.
 - [x] Implement one e2e test that syncs mock plugin items into SQLite through the real CLI.
