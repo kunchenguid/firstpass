@@ -9,7 +9,7 @@ Plugins own source-specific authentication, sync semantics, context rendering, a
 Plugin executables should be named `firstpass-src-<source>`.
 Every command accepts one JSON object on stdin and writes one JSON object on stdout.
 Diagnostic logs may go to stderr, but user-facing bug reports can redact stderr by default, so protocol failures should be represented in stdout when possible.
-The core passes `--protocol-version firstpass.plugin.v1` to plugin commands.
+The core passes `--protocol-version firstpass.plugin.v2` to plugin commands.
 Exit code `0` means the command returned a protocol-level response, including application statuses such as `permission_denied`.
 Nonzero exit codes are treated as transport or plugin process failures.
 
@@ -20,7 +20,7 @@ Supported commands are:
 | `manifest`        | Return source identity, trust metadata, requested scopes, capabilities, item types, and action catalog. |
 | `doctor`          | Report local readiness checks and warnings.                                                             |
 | `configure`       | Resolve source credentials and return the plugin's derived display name.                                |
-| `sync`            | Return changed items, recent events, deletion markers, cursor progress, and sync status.                |
+| `sync`            | Return recent item events, fingerprint progress, and sync status.                                       |
 | `fetch`           | Return full human and agent context plus evidence references for one item.                              |
 | `render`          | Return compact Markdown context for human item detail views.                                            |
 | `validate-action` | Check whether a proposed action payload is well formed, permitted, and still applicable.                |
@@ -37,7 +37,7 @@ Required top-level fields are:
 
 | Field              | Meaning                                                                       |
 | ------------------ | ----------------------------------------------------------------------------- |
-| `protocol_version` | The protocol version returned by the plugin, currently `firstpass.plugin.v1`. |
+| `protocol_version` | The protocol version returned by the plugin, currently `firstpass.plugin.v2`. |
 | `plugin`           | Object with `id`, `name`, and `version`.                                      |
 | `publisher`        | Object with `name` and optional `homepage_url`.                               |
 | `trust`            | Distribution and provenance metadata.                                         |
@@ -50,7 +50,7 @@ Example:
 
 ```json
 {
-  "protocol_version": "firstpass.plugin.v1",
+  "protocol_version": "firstpass.plugin.v2",
   "plugin": { "id": "tickets", "name": "Tickets", "version": "1.0.0" },
   "publisher": {
     "name": "Example Inc.",
@@ -120,26 +120,26 @@ Keep provenance, requested scopes, capabilities, and the action catalog current 
 
 ## Sync Semantics
 
-`sync` input includes the plugin's scope `config`, prior `cursor`, `limit`, and `mode` as `incremental` or `full`.
+`sync` input includes the plugin's scope `config` and prior `fingerprints`.
 There is no `account_id`: a configured plugin is the unit, so the core passes the plugin's own `config` object and treats it as opaque.
 If a plugin needs to represent more than one identity (for example two GitHub logins), it does so inside its own `config` and must keep its `external_id`s unique across those identities.
-The cursor is plugin-owned and can be any JSON value.
-The core saves the returned cursor only after items, events, deletion markers, and warnings are durably persisted.
+Fingerprints are plugin-owned and can be any JSON object.
+The core saves returned fingerprints only after events and warnings are durably persisted.
 
 `sync` status values are:
 
 | Status              | Meaning                                                                                                |
 | ------------------- | ------------------------------------------------------------------------------------------------------ |
-| `complete`          | The returned cursor covers all known source activity for the request window.                           |
-| `partial`           | The core should persist the response, save the cursor, and immediately sync again.                     |
+| `complete`          | The returned fingerprints cover all known source activity for the request window.                      |
+| `partial`           | The core should persist the response, save fingerprints, and immediately sync again.                   |
 | `rate_limited`      | The core should persist returned data and wait at least `retry_after_seconds` before retrying.         |
-| `cursor_invalid`    | The plugin cannot safely continue from the prior cursor and the core should rerun with `mode: "full"`. |
 | `permission_denied` | Credentials are missing or insufficient and the plugin should be marked unhealthy.                     |
+| `error`             | Sync failed and the plugin should be marked unhealthy with the returned warning.                       |
 
-Items should use stable `external_id` values and source-owned activity watermarks.
 Events should use stable `external_id` values that can be inserted idempotently.
-Deletion markers belong in `deleted_item_external_ids` and should use the same external ids as prior items.
-Repeated sync calls may return duplicate items or events if that is the safest source behavior.
+Item events should include source-owned activity watermarks and payloads with enough detail for core projections.
+Deletion or unavailable-item changes should be represented as events with the same external ids as prior items.
+Repeated sync calls may return duplicate events if that is the safest source behavior.
 
 ## Context And Evidence
 
@@ -175,11 +175,11 @@ When the source does not support client tokens, use natural keys or other best-e
 ## Authoring Checklist
 
 - Use `firstpass-src-<source>` as the executable name.
-- Validate `--protocol-version firstpass.plugin.v1` before processing commands.
+- Validate `--protocol-version firstpass.plugin.v2` before processing commands.
 - Keep stdout as exactly one JSON protocol object per command.
 - Keep action schemas small and strict with `additionalProperties: false` when possible.
 - Return stable item ids, event ids, evidence ids, and source URLs.
-- Treat cursors as opaque plugin-owned state and make sync idempotent.
+- Treat fingerprints as opaque plugin-owned state and make sync idempotent.
 - Disclose all credential scopes and trust metadata accurately in the manifest.
 - Prefer drafts or private source state over visible sends when the source supports it.
 - Validate and preview every remote action immediately before execution.

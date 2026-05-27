@@ -285,7 +285,7 @@ Required manifest fields:
 
 | Field              | Meaning                                                                                                                                                   |
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `protocol_version` | Protocol version such as `firstpass.plugin.v1`.                                                                                                           |
+| `protocol_version` | Protocol version such as `firstpass.plugin.v2`.                                                                                                           |
 | `plugin`           | `id`, `name`, and `version`.                                                                                                                              |
 | `publisher`        | Publisher `name` and optional `homepage_url`.                                                                                                             |
 | `trust`            | Distribution metadata such as `first_party`, `third_party`, `bundled`, explicit path, or package source.                                                  |
@@ -300,27 +300,26 @@ Each action type declares `type`, `display_name`, `description`, `safety`, `idem
 
 ### Sync And Context Commands
 
-`sync` returns changed items, recent events, updated opaque fingerprints, and explicit sync progress metadata.
+`sync` returns recent events, updated opaque fingerprints, and explicit sync progress metadata.
 The plugin may maintain private state in its own files, but the core persists fingerprints so backups and status are understandable.
-Fingerprints are committed only after the core has durably persisted every returned item, event, deletion, and warning in the response.
+Fingerprints are committed only after the core has durably persisted every returned event and warning in the response.
 
-`sync` input fields are the plugin's scope `config`, prior `fingerprints`, `limit`, optional conservative `since`, and `mode` as `incremental` or `full`; there is no `account_id`.
-`sync` output fields are `status`, next `fingerprints`, `has_more`, optional `retry_after_seconds`, `warnings`, `items`, `events`, and `deleted_item_external_ids`.
-Each item includes `external_id`, `item_type`, `title`, `actor`, `state`, `url`, `activity_at`, `activity_id`, `content_fingerprint`, `attention`, and `metadata`.
+`sync` input fields are the plugin's scope `config` and prior `fingerprints`; there is no `account_id`.
+`sync` output fields are `status`, `events`, next `fingerprints`, optional `has_more`, optional `retry_after_seconds`, and `warnings`.
+Each event includes `external_id`, `lifecycle`, source item fields such as `item_type`, `title`, `actor`, `state`, `url`, `activity_at`, `activity_id`, `fingerprint`, optional `attention`, opaque `payload`, optional `occurred_at`, and optional `metadata`.
 The `attention` object includes `should_surface`, `reason`, `waiting_on`, and optional `priority_hint`.
-Each event includes `external_id`, `item_external_id`, `event_type`, `actor`, `occurred_at`, and `metadata`.
 
-`status` is one of `complete`, `partial`, `rate_limited`, `cursor_invalid`, or `permission_denied`.
+`status` is one of `complete`, `partial`, `rate_limited`, `permission_denied`, or `error`.
 `complete` means the fingerprints cover all source activity known to the plugin for this request window.
 `partial` means the core should persist the response, save the returned fingerprints, and immediately schedule another sync because `has_more` is true or the plugin hit a bounded page.
 `rate_limited` means the core should persist any returned data but wait at least `retry_after_seconds` before retrying the plugin.
-`cursor_invalid` means the plugin cannot safely continue from the supplied fingerprints, so the core should keep local state, discard the fingerprints, and rerun `sync` with `mode: "full"` or a conservative `since` value.
 `permission_denied` means credentials are missing or no longer have the required scopes, so the core should mark the plugin unhealthy and avoid repeated sync attempts until the user reconfigures it.
+`error` means the plugin could not complete sync and the core should mark the plugin unhealthy with the returned warning.
 
 Pagination is plugin-owned.
 The core only treats a sync cycle as caught up when the latest response is `complete` and `has_more` is false.
-Plugins should make fingerprints monotonic and idempotent so repeated calls with the same fingerprints may return duplicate items or events without changing meaning.
-Plugins should include deletion or unavailable-item markers when the source exposes them, but core behavior cannot rely on every source reporting deletions.
+Plugins should make fingerprints monotonic and idempotent so repeated calls with the same fingerprints may return duplicate events without changing meaning.
+Plugins should include deletion or unavailable-item events when the source exposes them, but core behavior cannot rely on every source reporting deletions.
 Source clock skew is handled by plugin fingerprints first and timestamps second; the core uses `activity_at`, `activity_id`, and `content_fingerprint` together rather than trusting timestamps alone.
 
 `fetch` returns full source context for triage, including raw-ish structured data, rendered prompt text, attachment metadata, related object references, redaction hints, and evidence references.
@@ -641,7 +640,7 @@ E2e tests should cover:
 
 - First-run init, config loading, plugin discovery, manifest validation, and immediate plugin installation.
 - Daemon sync from a mocked source plugin into a real temporary SQLite database.
-- Sync idempotency with repeated fingerprints, duplicate events, pagination, `rate_limited`, `cursor_invalid`, `permission_denied`, deletions, and partial responses.
+- Sync idempotency with repeated fingerprints, duplicate events, pagination, `rate_limited`, `permission_denied`, `error`, deletions, and partial responses.
 - ACP recommendation generation through a mocked ACP target using the same `acpx/runtime` path as production.
 - Recommendation validation, evidence reference validation, invalid agent output, schema repair or error surfacing, raw ACP command redaction, cancellation, and usage estimation fallback.
 - Full review lifecycle: list, detail, approve, edit, dismiss, snooze, rerun, open-source-item, mark handled, and copy handoff prompt.

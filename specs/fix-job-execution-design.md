@@ -47,7 +47,7 @@ Both follow the existing JSON-stdin/JSON-stdout convention and are declared in t
 
 ### `prepare-automation-workspace`
 
-Input: `{ account_id, job: { id, kind, item_external_id }, config }`.
+Input: `{ config, job: { id, kind, item_external_id } }`.
 Output: `{ status, workspace_path, base_ref, branch, cleanup_token, warnings }`.
 
 The plugin clones or worktrees the repo into a path it controls (mirroring ezoss's persistent investigations checkout plus an ephemeral per-job worktree), creates the fix branch, and returns the absolute `workspace_path` for the core to run the agent in.
@@ -55,7 +55,7 @@ The plugin clones or worktrees the repo into a path it controls (mirroring ezoss
 
 ### `submit-automation-workspace`
 
-Input: `{ account_id, job, workspace_path, approval_id, idempotency_key }`.
+Input: `{ config, job, workspace_path, approval_id, idempotency_key }`.
 Output: `{ status, pr_url, commit, warnings, error }`.
 
 The plugin stages and commits any agent changes, pushes the branch, and opens a draft PR, returning the PR URL.

@@ -121,7 +121,7 @@ Imported bundled plugins are reinstalled with redacted config values, so credent
 FirstPass can route recommendation generation to an ACP-compatible target when configured.
 Hosted model targets should be treated as data-sharing boundaries because prompt context can include source-derived content.
 
-Use `firstpass status` to verify the currently configured ACP target and hosted-model disclosure before running triage.
+Use `firstpass status` to verify the currently configured ACP target before running triage.
 For sensitive sources, disable agent processing in config so items can sync without prompt-context generation:
 
 ```yaml
