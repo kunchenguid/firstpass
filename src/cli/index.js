@@ -18,6 +18,7 @@ import yaml from "js-yaml";
 import pkg from "../../package.json" with { type: "json" };
 
 import {
+  detectAgentSpecs,
   resolveAgentDetection,
   resolveEffectiveAgentSpec,
 } from "../agent/detect.js";
@@ -228,21 +229,20 @@ function normalizeOptionArray(value) {
 
 function initSetupContext() {
   const { stateDir, dbPath, configPath } = getStatePaths();
-  const detection = resolveAgentDetection({ agent: null });
+  const detectedAgents = detectAgentSpecs();
   const servicePlan = getServicePlan(stateDir, CLI_ENTRY);
   return {
     stateDir,
     dbExists: existsSync(dbPath),
     configExists: existsSync(configPath),
-    detectedAgent: detection.spec
-      ? { spec: detection.spec, id: detection.detected }
-      : null,
+    detectedAgents,
+    detectedAgent: detectedAgents[0] ?? null,
     serviceManager: servicePlan?.manager ?? null,
   };
 }
 
 function initSelectionsFromOptions(options = {}) {
-  const selections = defaultInitSelections({ currentStep: "core" });
+  const selections = defaultInitSelections({ currentStep: "agent" });
   if (options.agent === "auto") {
     selections.agentMode = "auto";
     selections.customAgent = "";
@@ -310,15 +310,30 @@ async function applyInitSelections(selections, context, mode) {
     cliEntry: CLI_ENTRY,
   });
   result.mode = mode;
-  if (plan.firstRun.syncNow) {
-    const pid = daemonPid();
-    result.first_sync = pid
-      ? (await requestDaemonSync())
-        ? "requested"
-        : "daemon_unreachable"
-      : "daemon_not_running";
-  }
   out(result);
+}
+
+// Graceful, cross-platform daemon stop, shared with `firstpass daemon stop`.
+async function gracefulStopDaemon() {
+  const { pidPath, controlAddress } = getStatePaths();
+  if (!existsSync(pidPath)) return { status: "not_running" };
+  const pid = Number(readFileSync(pidPath, "utf8"));
+  try {
+    await sendControl(controlAddress, { cmd: "stop" }, { timeoutMs: 3000 });
+  } catch {
+    // Control channel unreachable (stale pidfile, or a pre-socket daemon):
+    // fall back to a signal. This is forcible on Windows.
+    try {
+      process.kill(pid, "SIGTERM");
+    } catch {
+      return { status: "not_running" };
+    }
+  }
+  const gone = await pollFor(() => (isAlive(pid) ? null : true), {
+    timeoutMs: 8000,
+    intervalMs: 100,
+  });
+  return { status: gone ? "stopped" : "stopping", pid };
 }
 
 program
@@ -357,7 +372,10 @@ program
       options.wizard || (tty && !options.yes && !hasHeadlessInitFlags());
     if (wantsWizard) {
       const { launchInitWizardTui } = await import("../setup/init-app.js");
-      const selections = await launchInitWizardTui({ context });
+      const selections = await launchInitWizardTui({
+        context,
+        initialSelections: { source: "github" },
+      });
       if (!selections) {
         return out({ status: "cancelled" });
       }
@@ -1474,27 +1492,7 @@ daemon
   .command("stop")
   .description("Stop the background daemon")
   .action(async () => {
-    const { pidPath, controlAddress } = getStatePaths();
-    if (!existsSync(pidPath)) return out({ status: "not_running" });
-    const pid = Number(readFileSync(pidPath, "utf8"));
-    try {
-      // Graceful, cross-platform stop: ask the daemon to drain in-flight work.
-      await sendControl(controlAddress, { cmd: "stop" }, { timeoutMs: 3000 });
-    } catch {
-      // Control channel unreachable (stale pidfile, or a pre-socket daemon):
-      // fall back to a signal. This is forcible on Windows.
-      try {
-        process.kill(pid, "SIGTERM");
-      } catch {
-        return out({ status: "not_running" });
-      }
-    }
-    // Wait for the process to actually exit so callers can rely on a clean stop.
-    const gone = await pollFor(() => (isAlive(pid) ? null : true), {
-      timeoutMs: 8000,
-      intervalMs: 100,
-    });
-    out({ status: gone ? "stopped" : "stopping", pid });
+    out(await gracefulStopDaemon());
   });
 
 function isAlive(pid) {
