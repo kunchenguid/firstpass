@@ -15,19 +15,19 @@ Nonzero exit codes are treated as transport or plugin process failures.
 
 Supported commands are:
 
-| Command                        | Purpose                                                                                                 |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| `manifest`                     | Return source identity, capabilities, item types, and action catalog.                                   |
-| `doctor`                       | Report local readiness checks and warnings.                                                             |
-| `configure`                    | Resolve source credentials and return the plugin's derived display name.                                |
-| `sync`                         | Return recent item events, fingerprint progress, and sync status.                                       |
-| `fetch`                        | Return full human and agent context plus evidence references for one item.                              |
-| `validate-action`              | Check whether a proposed action payload is well formed, permitted, and still applicable.                |
-| `preview-action`               | Return the human-readable effect of a proposed action before approval.                                  |
-| `execute-action`               | Execute one approved action with an approval id and idempotency key.                                    |
-| `prepare-automation-workspace` | Prepare a source-owned workspace for an approved automation job.                                        |
-| `submit-automation-workspace`  | Submit workspace changes for an approved automation job.                                                |
-| `detect-automation-pr`         | Re-detect a pull request for a submitted automation job when initial detection was delayed.             |
+| Command                        | Purpose                                                                                     |
+| ------------------------------ | ------------------------------------------------------------------------------------------- |
+| `manifest`                     | Return source identity, capabilities, item types, and action catalog.                       |
+| `doctor`                       | Report local readiness checks and warnings.                                                 |
+| `configure`                    | Resolve source credentials and return the plugin's derived display name.                    |
+| `sync`                         | Return recent item events, fingerprint progress, and sync status.                           |
+| `fetch`                        | Return full human and agent context plus evidence references for one item.                  |
+| `validate-action`              | Check whether a proposed action payload is well formed, permitted, and still applicable.    |
+| `preview-action`               | Return the human-readable effect of a proposed action before approval.                      |
+| `execute-action`               | Execute one approved action with an approval id and idempotency key.                        |
+| `prepare-automation-workspace` | Prepare a source-owned workspace for an approved automation job.                            |
+| `submit-automation-workspace`  | Submit workspace changes for an approved automation job.                                    |
+| `detect-automation-pr`         | Re-detect a pull request for a submitted automation job when initial detection was delayed. |
 
 ## Manifest
 
