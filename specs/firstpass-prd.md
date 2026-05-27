@@ -91,12 +91,12 @@ Gmail is deferred from the MVP and any bundled Gmail plugin should be treated as
 
 | MVP includes                                                                      | MVP excludes                         | V1 adds                                                            |
 | --------------------------------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------ |
-| Local daemon polling configured plugin accounts.                                  | Hosted sync service.                 | First-party X plugin if API access is viable.                      |
+| Local daemon polling configured plugins.                                           | Hosted sync service.                 | First-party X plugin if API access is viable.                      |
 | SQLite database under `~/.firstpass`.                                             | Mobile app.                          | Attachment summarization pipeline.                                 |
 | Commander CLI and Ink terminal inbox UI.                                          | Team inboxes.                        | Source-specific prompt packs.                                      |
 | Plugin discovery, manifest validation, and manifest metadata persistence.        | Webhook server.                      | Per-source and per-account policies.                               |
 | Source plugin CLI protocol over JSON stdin/stdout.                                | Cross-device sync.                   | Approval receipts and action audit export.                         |
-| Item sync with plugin-owned cursors and explicit pagination/error semantics.      | Fully autonomous sending.            | Plugin sandboxing, signing, and permission enforcement.            |
+| Item sync with plugin-owned fingerprints and explicit pagination/error semantics. | Fully autonomous sending.            | Plugin sandboxing, signing, and permission enforcement.            |
 | Agent recommendation generation using plugin context and action schemas.          | Plugin marketplace.                  | Import/export of local state.                                      |
 | ACP agent runtime through bundled `acpx/runtime`; no native agent adapters.       | Complex workflow automation builder. | Optional webhook bridge for near-realtime sync.                    |
 | Multi-option recommendations with structured evidence citations.                  |                                      | Optional encrypted cloud backup, not required for local operation. |
@@ -170,7 +170,7 @@ firstpass daemon stop
 
 | Concept        | Definition                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Source plugin  | First-party or third-party executable implementing the `firstpass` plugin protocol; invoked by the core with command names and JSON payloads. A configured plugin is the unit of scope: it owns a single scope `config`, a single opaque sync cursor, rate-limit state, and plugin-owned credentials. Running multiple identities of one source (two GitHub logins, two Gmail mailboxes) is the plugin's own responsibility, expressed inside its `config` while keeping `external_id`s unique; the core does not model separate accounts. |
+| Source plugin  | First-party or third-party executable implementing the `firstpass` plugin protocol; invoked by the core with command names and JSON payloads. A configured plugin is the unit of scope: it owns a single scope `config`, a single opaque sync fingerprint baseline, rate-limit state, and plugin-owned credentials. Running multiple identities of one source (two GitHub logins, two Gmail mailboxes) is the plugin's own responsibility, expressed inside its `config` while keeping `external_id`s unique; the core does not model separate accounts. |
 | Item           | Source-neutral object that may need triage, such as a GitHub PR, Gmail thread, X reply, Linear issue, or Slack thread; stored as a normalized envelope plus plugin metadata JSON.                                                                                                                                                                                                                                                                                                                                                          |
 | Event          | Source-side change that may affect attention, such as a new email, PR review, tweet reply, or status change; core needs stable IDs, timestamps, actor identity, and plugin attention signal.                                                                                                                                                                                                                                                                                                                                               |
 | Recommendation | One agent run against one item at one observed activity watermark; contains one or more options; only one active recommendation per item.                                                                                                                                                                                                                                                                                                                                                                                                  |
@@ -204,7 +204,7 @@ Responsibilities:
 | Load config.                                                                                       | Authenticate with the source or locate source credentials. |
 | Discover plugins and validate manifests.                                                           | Declare capabilities and action schemas.                   |
 | Schedule syncs.                                                                                    | Sync changed items and events.                             |
-| Persist accounts, cursors, items, events, recommendations, approvals, and jobs.                    | Maintain source-specific cursors in opaque plugin state.   |
+| Persist plugin config, fingerprint baselines, items, events, recommendations, approvals, and jobs. | Maintain source-specific diff state in opaque plugin state. |
 | Decide triage eligibility using local watermarks and plugin attention hints.                       | Fetch complete item context for prompt assembly.           |
 | Build prompts from core policy, user policy, plugin context, evidence catalog, and action schemas. | Render compact human-readable context for the UI.          |
 | Invoke ACP targets through `acpx/runtime` and validate recommendation structure.                   | Render compact agent-readable context for prompts.         |
@@ -300,28 +300,28 @@ Each action type declares `type`, `display_name`, `description`, `safety`, `idem
 
 ### Sync And Context Commands
 
-`sync` returns changed items, recent events, an updated opaque cursor, and explicit sync progress metadata.
-The plugin may maintain private state in its own files, but the core persists the cursor so backups and status are understandable.
-The cursor is committed only after the core has durably persisted every returned item, event, deletion, and warning in the response.
+`sync` returns changed items, recent events, updated opaque fingerprints, and explicit sync progress metadata.
+The plugin may maintain private state in its own files, but the core persists fingerprints so backups and status are understandable.
+Fingerprints are committed only after the core has durably persisted every returned item, event, deletion, and warning in the response.
 
-`sync` input fields are the plugin's scope `config`, prior `cursor`, `limit`, optional conservative `since`, and `mode` as `incremental` or `full`; there is no `account_id`.
-`sync` output fields are `status`, next `cursor`, `has_more`, optional `retry_after_seconds`, `warnings`, `items`, `events`, and `deleted_item_external_ids`.
+`sync` input fields are the plugin's scope `config`, prior `fingerprints`, `limit`, optional conservative `since`, and `mode` as `incremental` or `full`; there is no `account_id`.
+`sync` output fields are `status`, next `fingerprints`, `has_more`, optional `retry_after_seconds`, `warnings`, `items`, `events`, and `deleted_item_external_ids`.
 Each item includes `external_id`, `item_type`, `title`, `actor`, `state`, `url`, `activity_at`, `activity_id`, `content_fingerprint`, `attention`, and `metadata`.
 The `attention` object includes `should_surface`, `reason`, `waiting_on`, and optional `priority_hint`.
 Each event includes `external_id`, `item_external_id`, `event_type`, `actor`, `occurred_at`, and `metadata`.
 
 `status` is one of `complete`, `partial`, `rate_limited`, `cursor_invalid`, or `permission_denied`.
-`complete` means the cursor covers all source activity known to the plugin for this request window.
-`partial` means the core should persist the response, save the returned cursor, and immediately schedule another sync because `has_more` is true or the plugin hit a bounded page.
-`rate_limited` means the core should persist any returned data but wait at least `retry_after_seconds` before retrying the account.
-`cursor_invalid` means the plugin cannot safely continue from the supplied cursor, so the core should keep local state, discard the cursor, and rerun `sync` with `mode: "full"` or a conservative `since` value.
+`complete` means the fingerprints cover all source activity known to the plugin for this request window.
+`partial` means the core should persist the response, save the returned fingerprints, and immediately schedule another sync because `has_more` is true or the plugin hit a bounded page.
+`rate_limited` means the core should persist any returned data but wait at least `retry_after_seconds` before retrying the plugin.
+`cursor_invalid` means the plugin cannot safely continue from the supplied fingerprints, so the core should keep local state, discard the fingerprints, and rerun `sync` with `mode: "full"` or a conservative `since` value.
 `permission_denied` means credentials are missing or no longer have the required scopes, so the core should mark the plugin unhealthy and avoid repeated sync attempts until the user reconfigures it.
 
 Pagination is plugin-owned.
 The core only treats a sync cycle as caught up when the latest response is `complete` and `has_more` is false.
-Plugins should make cursors monotonic and idempotent so repeated calls with the same cursor may return duplicate items or events without changing meaning.
+Plugins should make fingerprints monotonic and idempotent so repeated calls with the same fingerprints may return duplicate items or events without changing meaning.
 Plugins should include deletion or unavailable-item markers when the source exposes them, but core behavior cannot rely on every source reporting deletions.
-Source clock skew is handled by plugin cursors first and timestamps second; the core uses `activity_at`, `activity_id`, and `content_fingerprint` together rather than trusting timestamps alone.
+Source clock skew is handled by plugin fingerprints first and timestamps second; the core uses `activity_at`, `activity_id`, and `content_fingerprint` together rather than trusting timestamps alone.
 
 `fetch` returns full source context for triage, including raw-ish structured data, rendered prompt text, attachment metadata, related object references, redaction hints, and evidence references.
 Output should separate human UI context from agent prompt context and may include compact and full variants.
@@ -442,10 +442,10 @@ It creates a new eligibility decision at a newer watermark and may supersede act
 Daemon cycle:
 
 1. Load active configured plugins.
-2. Invoke plugin `sync` with saved cursor for each account.
+2. Invoke plugin `sync` with saved fingerprints for each configured plugin.
 3. Upsert returned items.
-4. Insert new events idempotently by plugin, account, item, and event external ID.
-5. Save the returned cursor only after successful item and event persistence.
+4. Insert new events idempotently by plugin, item, and event external ID.
+5. Save the returned fingerprints only after successful item and event persistence.
 6. Compute local triage eligibility for changed items.
 7. Claim a bounded number of eligible items for agent triage.
 8. Fetch full context for each claimed item.
@@ -515,7 +515,7 @@ The exact schema can evolve, but the core tables should conceptually include:
 
 | Table                    | Fields                                                                                                                                                                                                                                                                                                                                                                                                                |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `plugins`                | `id`, `binary_path`, `version`, `protocol_version`, `manifest_json`, `installed_at`, `last_checked_at`, `config_json`, `cursor_json`, `status`, `last_sync_at`, `last_error` (per-instance sync state lives here; there is no separate `source_accounts` table)                                                                                                                                                       |
+| `plugins`                | `id`, `binary_path`, `version`, `protocol_version`, `manifest_json`, `installed_at`, `last_checked_at`, `config_json`, `fingerprints_json`, `status`, `last_sync_at`, `last_error` (per-instance sync state lives here; there is no separate `source_accounts` table)                                                                                                                                                 |
 | `items`                  | `id`, `plugin_id`, `external_id`, `item_type`, `title`, `actor`, `state`, `url`, `activity_at`, `activity_id`, `content_fingerprint`, `attention_reason`, `attention_priority_hint`, `waiting_on`, `local_state`, `local_state_activity_at`, `local_state_activity_id`, `snoozed_until`, `metadata_json`, `created_at`, `updated_at`; unique on `(plugin_id, external_id)` and item id is `<plugin_id>:<external_id>` |
 | `events`                 | `id`, `item_id`, `external_id`, `event_type`, `actor`, `occurred_at`, `metadata_json`, `created_at`                                                                                                                                                                                                                                                                                                                   |
 | `prompt_contexts`        | `id`, `item_id`, `recommendation_id`, `retention_class`, `human_context_json`, `agent_context_json`, `evidence_json`, `redaction_hints_json`, `created_at`, `expires_at`, `deleted_at`                                                                                                                                                                                                                                |
@@ -593,7 +593,7 @@ V1 should provide an explicit export of local state, installed plugin identities
 Hosted backup can come later as an optional encrypted convenience layer and must not become required for normal local operation.
 
 Polling is the only required sync mechanism through MVP and V1.
-An optional webhook bridge can be added later for sources that support near-realtime delivery, but plugins must continue to work correctly with polling and cursors.
+An optional webhook bridge can be added later for sources that support near-realtime delivery, but plugins must continue to work correctly with polling and fingerprints.
 
 Shared team inboxes are out of scope for this product surface until the single-user approval and audit loop is proven.
 Team usage introduces assignment, shared policy, delegated approvals, shared credentials, multi-user audit, and conflict resolution.
@@ -641,7 +641,7 @@ E2e tests should cover:
 
 - First-run init, config loading, plugin discovery, manifest validation, and immediate plugin installation.
 - Daemon sync from a mocked source plugin into a real temporary SQLite database.
-- Sync idempotency with repeated cursors, duplicate events, pagination, `rate_limited`, `cursor_invalid`, `permission_denied`, deletions, and partial responses.
+- Sync idempotency with repeated fingerprints, duplicate events, pagination, `rate_limited`, `cursor_invalid`, `permission_denied`, deletions, and partial responses.
 - ACP recommendation generation through a mocked ACP target using the same `acpx/runtime` path as production.
 - Recommendation validation, evidence reference validation, invalid agent output, schema repair or error surfacing, raw ACP command redaction, cancellation, and usage estimation fallback.
 - Full review lifecycle: list, detail, approve, edit, dismiss, snooze, rerun, open-source-item, mark handled, and copy handoff prompt.
@@ -667,7 +667,7 @@ Phase 0: Project skeleton and protocol proof
 
 - [x] Create the Node ESM JavaScript package with Commander, `tsc --noEmit`, Vitest, linting, formatting, and build scripts.
 - [x] Add config loading for `~/.firstpass/config.yaml`, state directory creation, and snake_case config validation.
-- [x] Add the SQLite connection, migration runner, and initial schema for plugins, configured plugins, items, events, and cursors.
+- [x] Add the SQLite connection, migration runner, and initial schema for plugins, configured plugins, items, events, and fingerprints.
 - [x] Define runtime validators for plugin manifests, sync responses, fetch responses, recommendations, and action results.
 - [x] Build the mock source plugin executable with manifest, configure, sync, fetch, validate-action, preview-action, execute-action, and open-url commands.
 - [x] Add e2e harness utilities for temporary state directories, mocked source plugins, mocked ACP targets, and built CLI execution.
@@ -679,7 +679,7 @@ Phase 1: Core inbox loop
 - [x] Implement plugin discovery from explicit config paths, `~/.firstpass/plugins`, and `PATH` executables named `firstpass-src-*`.
 - [x] Implement manifest validation, trust metadata persistence, and immediate installation for configured plugins.
 - [x] Implement `firstpass plugin configure` and `firstpass plugin doctor` for the mock plugin.
-- [x] Implement the daemon sync loop with cursor persistence, pagination, rate-limit, cursor-invalid, permission-denied, deletion, and partial-response handling.
+- [x] Implement the daemon sync loop with fingerprint persistence, pagination, rate-limit, cursor-invalid, permission-denied, deletion, and partial-response handling.
 - [x] Implement item eligibility, local watermarks, simple attention policy, deterministic sorting, and item state transitions.
 - [x] Implement `firstpass list` and `firstpass view <item-id>` with compact structured output and definitive empty states.
 - [x] Implement ACP recommendation generation through `acpx/runtime` using a mocked ACP target in e2e tests.
@@ -700,7 +700,7 @@ Phase 3: First-party GitHub plugin
 
 - [x] Implement GitHub plugin configuration using existing credentials or OS credential storage without writing secrets to core config.
 - [x] Implement GitHub manifest, trust metadata, item types, action types, action schemas, safety levels, and prompt examples.
-- [x] Implement GitHub sync for issues, pull requests, review threads, comments, reviews, labels, state changes, cursors, and rate limits.
+- [x] Implement GitHub sync for issues, pull requests, review threads, comments, reviews, labels, state changes, fingerprints, and rate limits.
 - [x] Implement GitHub fetch context with compact human context, compact agent context, evidence references, source URLs, and code-related metadata.
 - [x] Implement GitHub action validation and previews for comments, labels, close, reopen, review actions, and safe PR actions.
 - [x] Implement GitHub action execution with approval IDs, idempotency keys, natural-key checks, and recorded source fixtures.
