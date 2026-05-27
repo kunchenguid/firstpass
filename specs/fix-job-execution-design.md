@@ -86,8 +86,8 @@ The job runs through explicit phases stored in `jobs.phase`, with `jobs.status` 
 | `succeeded` | `no_changes`          | Agent produced no diff; recorded, no PR.                     |
 | `failed`    | `failed`              | Any step failed; `error` set, workspace left for inspection. |
 
-Claiming is a guarded `update ... set status='running' where id=? and status='queued'` so two daemon cycles never run the same job (the same single-claim pattern the triage pass uses).
-A stale-job sweep re-queues `running` jobs whose `updated_at` is older than a timeout (default 30m), matching ezoss's reclaim behavior.
+Claiming is queue-backed: the daemon consumes fix-job effects, records phase transitions, and relies on the queue/effect model to avoid duplicate execution.
+Automatic stale-job requeueing is not implemented in the current release.
 
 ## Daemon Job Stage
 
@@ -123,7 +123,7 @@ Recommendation for MVP: draft-only, audited, no second prompt, with a plugin con
 
 - A failed step sets `status: failed`, records `error`, and leaves the workspace on disk for inspection (ezoss does the same).
 - `submit-automation-workspace` is idempotent on `idempotency_key` so a retried submit re-detects the existing PR instead of opening a duplicate.
-- The stale-job reclaim handles a daemon crash mid-run.
+- A daemon crash mid-run leaves the job record for inspection; automatic stale-job reclaim is future recovery work.
 - Workspaces are retained per the retention model; add a `workspace_ttl` so old checkouts are cleaned.
 
 ## Testing Strategy

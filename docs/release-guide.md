@@ -66,13 +66,14 @@ firstpass plugin list
 firstpass plugin doctor
 ```
 
-Install a discovered plugin:
+Install a bundled plugin:
 
 ```sh
-firstpass plugin add <plugin-id>
+firstpass plugin add <mock|github|gmail>
 ```
 
 `firstpass plugin doctor` health-checks installed plugins.
+This release only installs bundled plugins.
 
 ## Credentials
 
@@ -107,7 +108,7 @@ firstpass state export > firstpass-state.json
 firstpass state import firstpass-state.json
 ```
 
-State export includes installed plugin identities and redacted core configuration, including raw custom ACP command strings.
+State export includes installed plugin identities and redacted core configuration, including redacted forms of raw custom ACP command strings.
 It does not export plugin configuration or credentials.
 Imported bundled plugins are reinstalled with existing local config if present, or empty config otherwise, so credentials must be supplied again when needed.
 
@@ -119,7 +120,7 @@ Hosted model targets should be treated as data-sharing boundaries because prompt
 Use `firstpass status` to verify the currently configured ACP target before running triage.
 For sensitive sources, use a local ACP target or avoid running triage for plugins whose source content should not enter prompts.
 
-Custom ACP command specs are redacted in status, item detail, and state export output.
+Raw custom ACP command strings are redacted in state export output when stored in core config.
 Accepted ACP target config values are either `agent: null`, a named registry target such as `agent: acp:mock-agent`, or a raw ACP server command string after `acp:`.
 Raw command targets are shown as `acp:custom` in status and audit surfaces.
 
@@ -134,7 +135,7 @@ FirstPass can sync GitHub items, generate local recommendations, preview actions
 1. Ensure GitHub credentials are available through the GitHub plugin's supported credential path.
 2. Install the GitHub plugin.
 3. Configure the GitHub source.
-4. Run a one-shot sync.
+4. Start the daemon and run sync.
 5. Review the queue.
 6. Triage an item.
 7. Inspect the recommendation and evidence.
@@ -148,6 +149,7 @@ firstpass plugin add github
 firstpass plugin configure github \
   --config username=<github-login> \
   --config explicit_repos=<owner>/<repo>
+firstpass daemon start
 firstpass sync
 firstpass list
 firstpass view <item-id>

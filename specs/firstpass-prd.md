@@ -94,7 +94,7 @@ Gmail is deferred from the MVP and any bundled Gmail plugin should be treated as
 | Local daemon polling configured plugins.                                           | Hosted sync service.                 | First-party X plugin if API access is viable.                      |
 | SQLite database under `~/.firstpass`.                                             | Mobile app.                          | Attachment summarization pipeline.                                 |
 | Commander CLI and Ink terminal inbox UI.                                          | Team inboxes.                        | Source-specific prompt packs.                                      |
-| Plugin discovery, manifest validation, and manifest metadata persistence.        | Webhook server.                      | Per-source and per-account policies.                               |
+| Bundled plugin installation, manifest validation, and manifest metadata persistence. | Webhook server.                      | Per-source and per-account policies.                               |
 | Source plugin CLI protocol over JSON stdin/stdout.                                | Cross-device sync.                   | Approval receipts and action audit export.                         |
 | Item sync with plugin-owned fingerprints and explicit pagination/error semantics. | Fully autonomous sending.            | Plugin sandboxing, signing, and permission enforcement.            |
 | Agent recommendation generation using plugin context and action schemas.          | Plugin marketplace.                  | Import/export of local state.                                      |
@@ -541,15 +541,11 @@ Plugins should prefer OS keychain, existing CLIs, OAuth token stores, or their o
 The config contains `agent`, `poll_interval`, `acp_registry_overrides`, and `plugins`.
 The state directory comes from `FIRSTPASS_STATE_DIR` or defaults to `~/.firstpass`, and installed plugin config is stored with the plugin record.
 
-Plugin discovery order:
-
-- Explicit paths in config.
-- `~/.firstpass/plugins`.
-- Executables on `PATH` named `firstpass-src-*`.
+MVP plugin installation is limited to bundled plugin IDs exposed by `firstpass plugin list`.
+Third-party discovery from explicit config paths, `~/.firstpass/plugins`, or `PATH` executables named `firstpass-src-*` is future work.
 
 The plugin command should be stable enough for third-party plugins in any language.
-First-party plugins can be bundled later, but the protocol should not require Go.
-Discovery does not imply provenance or safety.
+Bundling does not imply provenance or safety.
 The core should store plugin source, scope, capability, and action metadata for installed plugins.
 
 ## Security, Privacy, And Observability
@@ -640,7 +636,7 @@ No default test requires live network access.
 
 E2e tests should cover:
 
-- First-run init, config loading, plugin discovery, manifest validation, and immediate plugin installation.
+- First-run init, config loading, bundled plugin listing, manifest validation, and immediate plugin installation.
 - Daemon sync from a mocked source plugin into a real temporary SQLite database.
 - Sync idempotency with repeated fingerprints, duplicate events, pagination, `rate_limited`, `permission_denied`, `error`, deletions, and partial responses.
 - ACP recommendation generation through a mocked ACP target using the same `acpx/runtime` path as production.
@@ -677,8 +673,8 @@ Phase 0: Project skeleton and protocol proof
 
 Phase 1: Core inbox loop
 
-- [x] Implement plugin discovery from explicit config paths, `~/.firstpass/plugins`, and `PATH` executables named `firstpass-src-*`.
-- [x] Implement manifest validation, trust metadata persistence, and immediate installation for configured plugins.
+- [x] Implement bundled plugin listing and immediate installation for known plugin IDs.
+- [x] Implement manifest validation, manifest metadata persistence, and immediate installation for configured plugins.
 - [x] Implement `firstpass plugin configure` and `firstpass plugin doctor` for the mock plugin.
 - [x] Implement the daemon sync loop with fingerprint persistence, pagination, rate-limit, permission-denied, error, deletion, and partial-response handling.
 - [x] Implement item eligibility, local watermarks, simple attention policy, deterministic sorting, and item state transitions.
