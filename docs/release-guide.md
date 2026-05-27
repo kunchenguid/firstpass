@@ -31,13 +31,26 @@ node src/cli/index.js status
 
 ## Initial Setup
 
-Initialize local configuration and state:
+Run the guided setup in an interactive terminal:
 
 ```sh
 firstpass init
 firstpass status
 ```
 
+The wizard initializes local state, discloses the ACP agent boundary, offers GitHub or skip source setup, and defaults to installing the managed daemon service.
+For CI, release validation, or agent-driven setup, use headless flags instead:
+
+```sh
+firstpass init --yes \
+  --agent auto \
+  --plugin github \
+  --github-repo <owner>/<repo> \
+  --no-install-service
+firstpass status
+```
+
+Use `--wizard` to force the interactive wizard, or `--plugin skip` when validating local state without a source.
 By default, FirstPass reads configuration and stores local state under `~/.firstpass`.
 Set `FIRSTPASS_STATE_DIR` to use a different state directory.
 The status command reports configured state, agent target and source, installed plugin sync health, local item counts, queue counts, and audit event count.
@@ -69,7 +82,7 @@ firstpass plugin doctor
 Install a bundled plugin:
 
 ```sh
-firstpass plugin add <mock|github|gmail>
+firstpass plugin add <github|gmail>
 ```
 
 `firstpass plugin doctor` health-checks installed plugins.
@@ -121,22 +134,22 @@ Hosted model targets should be treated as data-sharing boundaries because prompt
 Use `firstpass status` to verify the currently configured ACP target before running triage.
 For sensitive sources, use a local ACP target or avoid running triage for plugins whose source content should not enter prompts.
 
-Accepted ACP target config values are either `agent: null`, a named registry target such as `agent: acp:mock-agent`, or a raw ACP server command string after `acp:`.
+Accepted ACP target config values are either `agent: null`, a named registry target such as `agent: acp:claude`, or a raw ACP server command string after `acp:`.
 Status output shows the configured ACP target, including raw custom command strings.
 Avoid secrets in custom ACP commands; use environment variables or external credential stores instead.
 
 ## First GitHub Workflow
 
-GitHub and mock are the only required MVP source paths.
+GitHub is the required production source path for this release.
 The bundled Gmail plugin, if present, is fixture-backed or demo-only for this release and should not be used as evidence of production Gmail readiness.
 
 The first GitHub workflow is intentionally approval-first.
 FirstPass can sync GitHub items, generate local recommendations, preview actions, and execute only after explicit approval.
 
 1. Ensure GitHub credentials are available through the GitHub plugin's supported credential path.
-2. Install the GitHub plugin.
-3. Configure the GitHub source.
-4. Start the daemon and run sync.
+2. Run setup with GitHub selected.
+3. Install or start the daemon through setup.
+4. Run sync.
 5. Review the queue.
 6. Triage an item.
 7. Inspect the recommendation and evidence.
@@ -146,11 +159,9 @@ FirstPass can sync GitHub items, generate local recommendations, preview actions
 Commands:
 
 ```sh
-firstpass plugin add github
-firstpass plugin configure github \
-  --config username=<github-login> \
-  --config explicit_repos=<owner>/<repo>
-firstpass daemon start
+firstpass init --yes \
+  --plugin github \
+  --github-repo <owner>/<repo>
 firstpass sync
 firstpass list
 firstpass view <item-id>
@@ -161,7 +172,8 @@ firstpass approve <recommendation-id> --option <option-id> --confirm
 firstpass audit receipt <approval-id>
 ```
 
-Use `--config owned_repos=true` to sync source repositories for the configured username, or `--config authored_external=true` to sync recently updated issues and PRs authored by that user outside explicitly configured repositories.
+Manual `plugin add`, `plugin configure`, and `daemon start` remain available when you need to bypass setup.
+Use `--github-owned` to sync source repositories for `--github-username`, or `--github-authored-external` to sync recently updated issues and PRs authored by that user outside explicitly configured repositories.
 GitHub approvals can create real comments, reviews, close/reopen state changes, and other source-visible effects declared by the plugin action catalog.
 Review `firstpass preview` output before running `firstpass approve`; destructive actions require the additional `--confirm-destructive` flag.
 
@@ -185,6 +197,6 @@ After publishing, verify a fresh global install on each supported Node and OS ta
 ```sh
 npm install -g firstpass
 firstpass --version
-firstpass init
+firstpass init --yes --plugin skip --no-install-service
 firstpass status
 ```

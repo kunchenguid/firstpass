@@ -33,30 +33,46 @@
   /></a>
 </p>
 
-<h3 align="center">An AI triages your GitHub inbox. You approve before anything ships.</h3>
+<h3 align="center">An AI triages your GitHub inbox.<br />You approve before anything ships.</h3>
 
-Your issues and pull requests pile up faster than you can read them. You could hand the whole thing to an agent, but then it is commenting, closing, and merging on your behalf while you are not looking - and that is exactly the part you do not want to give away.
+Your issues and pull requests pile up faster than you can read them.
+You could hand the whole thing to an agent, but then it is commenting, closing, and merging on your behalf while you are not looking - and that is exactly the part you do not want to give away.
 
-`firstpass` splits the work. A local daemon syncs your sources, an AI agent reads each item and recommends what to do, and the recommendation sits in a queue. Nothing source-visible happens until you preview the exact outgoing action and explicitly confirm it.
+`firstpass` splits the work.
+A local daemon syncs your sources, an AI agent reads each item and recommends what to do, and the recommendation sits in a queue.
+Nothing source-visible happens until you preview the exact outgoing action and explicitly confirm it.
 
-- **Local-first** - the queue, daemon, SQLite database, and ACP sessions all live under `~/.firstpass`. No hosted backend.
-- **Preview-then-approve** - the agent only recommends. Every external write waits behind a preview and an explicit `--confirm` gate; destructive actions need `--confirm-destructive`.
-- **Pluggable sources** - GitHub issues and PRs out of the box, a deterministic `mock` plugin for safe end-to-end runs, and a documented plugin contract for adding your own.
+- **Local-first** - the queue, daemon, SQLite database, and ACP sessions all live under `~/.firstpass`.
+  No hosted backend.
+- **Preview-then-approve** - the agent only recommends.
+  Every external write waits behind a preview and an explicit `--confirm` gate; destructive actions need `--confirm-destructive`.
+- **Pluggable sources** - GitHub issues and PRs out of the box, plus a documented plugin contract for adding trusted sources of your own.
 
 ## Quick Start
 
-The bundled `mock` plugin produces a deterministic item with no external side effects, so it is the safest way to drive the whole pipeline:
+Run the guided setup in a terminal:
 
 ```sh
-$ firstpass init                      # create ~/.firstpass and the database
-$ firstpass plugin add mock           # install a side-effect-free source
-$ firstpass daemon start              # the sole worker: syncs, triages, acts
-$ firstpass sync                      # nudge an immediate sync + triage
-$ firstpass list                      # the AI-triaged inbox, with recommendation ids
-mock:issue-1   comment   rec_a1b2   "Reply asking for a repro"
+$ firstpass init
+```
 
-$ firstpass preview rec_a1b2          # see the exact outgoing action (the gate)
-$ firstpass approve rec_a1b2 --confirm # confirm and execute
+The wizard creates local state, discloses the ACP agent boundary, offers GitHub or skip, and defaults to installing the managed daemon service.
+For scripts or CI, use flags instead of prompts:
+
+```sh
+$ firstpass init --yes \
+  --agent auto \
+  --plugin github \
+  --github-repo <owner>/<repo>
+$ firstpass sync
+$ firstpass
+```
+
+External writes still wait behind preview and approval:
+
+```sh
+$ firstpass preview <recommendation-id>
+$ firstpass approve <recommendation-id> --confirm
 ```
 
 Run `firstpass` with no arguments in a terminal to open the live interactive inbox instead.
@@ -82,10 +98,11 @@ To hack on the code without installing, run it straight from source with `node s
 
 ## How It Works
 
-The daemon is the only worker. It owns sync, triage, action execution, and automation jobs - the CLI and TUI just emit intents and read state.
+The daemon is the only worker.
+It owns sync, triage, action execution, and automation jobs - the CLI and TUI just emit intents and read state.
 
 ```
-  sources (github, mock, ...)
+  sources (github, plugins, ...)
           │  daemon sync
           ▼
         items ───────► agent triage (ACP) ───────► recommendation
@@ -108,13 +125,14 @@ The daemon is the only worker. It owns sync, triage, action execution, and autom
 - **The daemon is the sole actor** - syncing, triage, and writes all flow through one background process so there is a single source of truth and one audit trail.
 - **Approval is preview-then-confirm** - `preview` renders the precise effect; `approve --confirm` is the one human gate before anything reaches a source.
 - **Agent is ACP-pluggable** - `firstpass` auto-detects an installed provider CLI (`claude`, then `codex`, then `opencode`) as its `acp:` target, or you set one explicitly in config.
-- **Automation jobs stay reviewable** - approving a fix option queues a coding-agent job that the daemon runs into a draft pull request. It never merges for you.
+- **Automation jobs stay reviewable** - approving a fix option queues a coding-agent job that the daemon runs into a draft pull request.
+  It never merges for you.
 
 ## CLI Reference
 
 | Command                          | Description                                                  |
 | -------------------------------- | ------------------------------------------------------------ |
-| `firstpass init`                 | Initialize the local state directory and database            |
+| `firstpass init`                 | Open guided setup on a TTY, or initialize local state        |
 | `firstpass status`               | Show resolved agent, plugins, queue, and inbox status        |
 | `firstpass sync`                 | Nudge the daemon to sync + triage all active plugins now     |
 | `firstpass list`                 | List the active review inbox                                 |
@@ -139,16 +157,29 @@ The daemon is the only worker. It owns sync, triage, action execution, and autom
 
 ### Flags
 
-| Command                    | Flag                    | Description                            |
-| -------------------------- | ----------------------- | -------------------------------------- |
-| `preview`                  | `--option <selector>`   | Pick an option by id or position       |
-| `approve`                  | `--option <selector>`   | Pick an option by id or position       |
-| `approve`                  | `--confirm`             | Confirm external-write actions         |
-| `approve`                  | `--confirm-destructive` | Confirm destructive actions            |
-| `rerun`                    | `--instructions <text>` | Extra instructions for the agent       |
-| `plugin add` / `configure` | `--config <k=v...>`     | Set plugin configuration pairs         |
-| `daemon run`               | `--once`                | Process the queue once and exit        |
-| `update`                   | `--check`               | Only check the registry; never install |
+| Command                    | Flag                          | Description                                           |
+| -------------------------- | ----------------------------- | ----------------------------------------------------- |
+| `init`                     | `--yes`                       | Apply setup defaults without prompts                  |
+| `init`                     | `--wizard`                    | Force the interactive setup wizard                    |
+| `init`                     | `--agent <target>`            | `auto` or an explicit `acp:<target>`                  |
+| `init`                     | `--plugin github\|skip\|none` | Configure GitHub or skip source setup                 |
+| `init`                     | `--github-repo <repo...>`     | Sync explicit `owner/repo` sources                    |
+| `init`                     | `--github-username <login>`   | GitHub login for discovered scopes                    |
+| `init`                     | `--github-owned`              | Sync repositories owned by the GitHub user            |
+| `init`                     | `--github-public-owned`       | Sync public repositories owned by the user            |
+| `init`                     | `--github-public-starred`     | Sync public owned repositories starred by user        |
+| `init`                     | `--github-authored-external`  | Sync authored issues and PRs outside configured repos |
+| `init`                     | `--install-service`           | Install the managed daemon service                    |
+| `init`                     | `--no-install-service`        | Opt out of the managed daemon service                 |
+| `init`                     | `--start-daemon`              | Start a detached daemon without a service             |
+| `preview`                  | `--option <selector>`         | Pick an option by id or position                      |
+| `approve`                  | `--option <selector>`         | Pick an option by id or position                      |
+| `approve`                  | `--confirm`                   | Confirm external-write actions                        |
+| `approve`                  | `--confirm-destructive`       | Confirm destructive actions                           |
+| `rerun`                    | `--instructions <text>`       | Extra instructions for the agent                      |
+| `plugin add` / `configure` | `--config <k=v...>`           | Set plugin configuration pairs                        |
+| `daemon run`               | `--once`                      | Process the queue once and exit                       |
+| `update`                   | `--check`                     | Only check the registry; never install                |
 
 ## Sources
 
@@ -158,6 +189,14 @@ The bundled GitHub plugin syncs issues and pull requests through `gh`, and suppo
 
 ```sh
 gh auth status || gh auth login
+firstpass init --yes \
+  --plugin github \
+  --github-repo <owner>/<repo>
+```
+
+Manual plugin setup is still available:
+
+```sh
 firstpass plugin add github
 firstpass plugin configure github \
   --config username=<github-login> \
@@ -165,7 +204,8 @@ firstpass plugin configure github \
 firstpass plugin doctor                 # confirm the daemon resolves your gh credentials
 ```
 
-`gh` must be authenticated in the same environment the daemon runs under. Configure at least one source (`explicit_repos`, `owned_repos=true`, `repo_conditions`, or `authored_external=true`), or sync completes with an empty inbox.
+`gh` must be authenticated in the same environment the daemon runs under.
+Configure at least one source (`explicit_repos`, `owned_repos=true`, `repo_conditions`, or `authored_external=true`), or sync completes with an empty inbox.
 
 Every item is stamped with a **role**: _maintainer_ items (repos you own or configure) expose all actions including `merge` and `review`; _contributor_ items (things you authored elsewhere, via `authored_external`) carry a `[contrib]` badge and only offer comment/close.
 
@@ -186,7 +226,8 @@ Common GitHub plugin config keys:
 
 ### Gmail
 
-The bundled Gmail plugin is demo-only and fixture-backed in this release. It does not perform live Gmail writes.
+The bundled Gmail plugin is demo-only and fixture-backed in this release.
+It does not perform live Gmail writes.
 
 ## Configuration
 
@@ -200,7 +241,8 @@ acp_registry_overrides: {}
 plugins: {}
 ```
 
-If `~/.firstpass/AGENTS.md` exists, its contents are passed to every triage as a user policy, so you can steer recommendations globally. Run `firstpass status` to see the resolved agent.
+If `~/.firstpass/AGENTS.md` exists, its contents are passed to every triage as a user policy, so you can steer recommendations globally.
+Run `firstpass status` to see the resolved agent.
 
 ## Running As A Service
 
@@ -212,7 +254,8 @@ firstpass daemon install        # managed OS service: launchd / systemd --user /
 firstpass daemon uninstall
 ```
 
-A managed daemon launched from a GUI context inherits a minimal `PATH`, so `firstpass` resolves your login-shell environment at startup to find `gh`, `git`, and provider CLIs. Set `FIRSTPASS_SKIP_SHELLENV=1` to disable that resolution.
+A managed daemon launched from a GUI context inherits a minimal `PATH`, so `firstpass` resolves your login-shell environment at startup to find `gh`, `git`, and provider CLIs.
+Set `FIRSTPASS_SKIP_SHELLENV=1` to disable that resolution.
 
 ## Development
 
