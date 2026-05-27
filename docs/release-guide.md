@@ -108,7 +108,8 @@ firstpass state export > firstpass-state.json
 firstpass state import firstpass-state.json
 ```
 
-State export includes installed plugin identities and redacted core configuration, including redacted forms of raw custom ACP command strings.
+State export includes installed plugin identities and redacted core configuration.
+Redaction is key-name based for secret-like values; raw custom ACP command strings in `agent` config are not redacted, so do not include secrets in ACP command arguments.
 It does not export plugin configuration or credentials.
 Imported bundled plugins are reinstalled with existing local config if present, or empty config otherwise, so credentials must be supplied again when needed.
 
@@ -120,9 +121,9 @@ Hosted model targets should be treated as data-sharing boundaries because prompt
 Use `firstpass status` to verify the currently configured ACP target before running triage.
 For sensitive sources, use a local ACP target or avoid running triage for plugins whose source content should not enter prompts.
 
-Raw custom ACP command strings are redacted in state export output when stored in core config.
 Accepted ACP target config values are either `agent: null`, a named registry target such as `agent: acp:mock-agent`, or a raw ACP server command string after `acp:`.
-Raw command targets are shown as `acp:custom` in status and audit surfaces.
+Status output shows the configured ACP target, including raw custom command strings.
+Avoid secrets in custom ACP commands; use environment variables or external credential stores instead.
 
 ## First GitHub Workflow
 

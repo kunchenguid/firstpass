@@ -282,12 +282,17 @@ Later versions can add sandboxing, signed plugins, permission prompts, and stron
 ### Manifest
 
 The manifest declares source identity, protocol version, configuration schema, trust metadata, requested source scopes, item types, action types, and capabilities.
-Required manifest fields:
+Protocol-required manifest fields:
 
 | Field              | Meaning                                                                                                                                                   |
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `protocol_version` | Protocol version such as `firstpass.plugin.v2`.                                                                                                           |
 | `plugin`           | `id`, `version`, optional `display_name`, and optional `publisher`.                                                                                        |
+
+Recommended manifest metadata fields:
+
+| Field              | Meaning                                                                                                                                                   |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `trust`            | Distribution metadata such as `first_party`, `third_party`, `bundled`, explicit path, or package source.                                                  |
 | `requested_scopes` | Source credential scopes with human-readable purposes.                                                                                                    |
 | `capabilities`     | Array of declared capability metadata.                                                                                                                    |
@@ -381,7 +386,8 @@ It asks the agent to ground rationale in visible source context and prefers no r
 MVP uses ACP as the only agent integration boundary.
 `firstpass` depends on bundled `acpx/runtime`, accepts `agent: acp:<target-or-command>`, and does not implement native Claude, Codex, OpenCode, or Rovo Dev adapters in core.
 Named ACP targets resolve through the bundled `acpx` registry plus user-configured `acp_registry_overrides`.
-Raw custom ACP server commands may be supplied after `acp:`, but raw command specs are redacted as `acp:custom` in logs, errors, telemetry, and status output.
+Raw custom ACP server commands may be supplied after `acp:`.
+Raw command target redaction is applied only on surfaces that explicitly call the ACP target redactor; status output and state export can expose the configured command string, so custom ACP commands must not contain secrets.
 
 The daemon creates one persistent ACP session per logical firstpass worker and stores ACP session state under `~/.firstpass/acp-sessions` or a run-specific child directory.
 Each triage run starts a turn with the assembled prompt plus the recommendation JSON Schema as the final output contract.
@@ -709,7 +715,7 @@ Phase 4: Trust, privacy, and retention
 - [x] Implement retention policies for raw context, rendered context, prompts, drafts, attachments, and audit-preserved records.
 - [x] Implement retention cleanup jobs and e2e coverage for expiration without deleting required audit history.
 - [x] Add ACP target disclosure and hosted-model warning copy.
-- [x] Add raw ACP command redaction across logs, errors, status output, and e2e assertions.
+- [x] Add raw ACP command redaction helper for logs and user-facing errors; status and export hardening remains future work.
 - [x] Persist plugin manifest metadata for publisher, version, requested scopes, capabilities, and action catalog metadata.
 - [x] Add user-facing plugin author documentation for manifests, protocol commands, trust metadata, scopes, and safety levels.
 - [x] Add export/import for installed plugin identities and redacted core configuration.

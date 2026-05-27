@@ -34,12 +34,17 @@ Supported commands are:
 The manifest is the provenance and capability boundary between core and plugin.
 Keep it accurate because FirstPass stores it and uses it to validate recommendations.
 
-Required top-level fields are:
+Protocol-required top-level fields are:
 
 | Field              | Meaning                                                                       |
 | ------------------ | ----------------------------------------------------------------------------- |
 | `protocol_version` | The protocol version returned by the plugin, currently `firstpass.plugin.v2`. |
 | `plugin`           | Object with `id`, `version`, optional `display_name`, and optional `publisher`. |
+
+Recommended top-level metadata fields are:
+
+| Field              | Meaning                                                               |
+| ------------------ | --------------------------------------------------------------------- |
 | `trust`            | Distribution and provenance metadata.                                         |
 | `requested_scopes` | Array of source credential scopes and human-readable purposes.                |
 | `capabilities`     | Array of declared capability metadata.                                        |
