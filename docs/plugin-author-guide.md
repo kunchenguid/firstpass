@@ -30,8 +30,8 @@ Supported commands are:
 
 ## Manifest
 
-The manifest is the trust and capability boundary between core and plugin.
-Keep it accurate because FirstPass stores it, shows it during trust prompts, and uses it to validate recommendations.
+The manifest is the provenance and capability boundary between core and plugin.
+Keep it accurate because FirstPass stores it and uses it to validate recommendations.
 
 Required top-level fields are:
 
@@ -116,8 +116,7 @@ If writes are optional, document how users can configure read-only credentials a
 Never store secrets in FirstPass core config unless a source makes that unavoidable.
 Prefer source CLIs, OS keychain storage, OAuth token stores, or plugin-owned encrypted files.
 
-FirstPass detects material manifest trust changes such as binary path, publisher, version, requested scopes, capabilities, and action catalog changes.
-Users can be asked to re-confirm trust when those change.
+Keep provenance, requested scopes, capabilities, and the action catalog current so users can inspect what the plugin can access and do.
 
 ## Sync Semantics
 
@@ -181,7 +180,7 @@ When the source does not support client tokens, use natural keys or other best-e
 - Keep action schemas small and strict with `additionalProperties: false` when possible.
 - Return stable item ids, event ids, evidence ids, and source URLs.
 - Treat cursors as opaque plugin-owned state and make sync idempotent.
-- Disclose all credential scopes and trust metadata before users trust the plugin at `plugin add`.
+- Disclose all credential scopes and trust metadata so users can inspect the plugin before installation.
 - Prefer drafts or private source state over visible sends when the source supports it.
 - Validate and preview every remote action immediately before execution.
 - Avoid logging secrets to stderr because users may still choose to share raw plugin logs.
