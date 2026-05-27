@@ -35,17 +35,18 @@ import {
   pluginPreviewAction,
   readManifest,
 } from "../host/plugin.js";
-import {
-  ensureStateDir,
-  getStatePaths,
-  loadConfig,
-  saveConfig,
-} from "./state.js";
+import { getStatePaths, loadConfig, saveConfig } from "./state.js";
 import { openRuntime, runOnce } from "./runtime.js";
 import { getServicePlan, isServiceDryRun } from "./service.js";
 import { compareSemver, fetchLatestVersion, isUpdateDryRun } from "./update.js";
 import { recommendationDetail } from "../core/views.js";
 import { renderInboxView } from "../tui/render.js";
+import { applyInitPlan, initializeCoreState } from "../setup/init-apply.js";
+import {
+  buildInitApplyPlan,
+  defaultInitSelections,
+  validateInitSelections,
+} from "../setup/init-model.js";
 
 const CLI_ENTRY = fileURLToPath(import.meta.url);
 
@@ -79,6 +80,7 @@ const fail = (msg, code = 1) => {
   process.stderr.write(`${msg}\n`);
   process.exitCode = code;
 };
+const failUsage = (msg) => fail(msg, 2);
 
 // The daemon is the sole loop/consumer. The CLI only ever appends events
 // (writes) and reads projections - it never drains the queue itself.
@@ -157,18 +159,6 @@ function parseConfigPairs(pairs = []) {
   return config;
 }
 
-function seedRetentionPolicy(db) {
-  const exists = db
-    .prepare("select id from retention_policies where id='retention-default'")
-    .get();
-  if (exists) return;
-  const now = new Date().toISOString();
-  db.prepare(
-    `insert into retention_policies (id, scope, raw_context_ttl, prompt_ttl, draft_ttl, attachment_ttl, audit_ttl, created_at, updated_at)
-     values ('retention-default','global','7d','30d','30d','7d','365d',?,?)`,
-  ).run(now, now);
-}
-
 const program = new Command();
 program
   .name("firstpass")
@@ -199,18 +189,183 @@ program.action(async () => {
 });
 
 // --- init ------------------------------------------------------------------
+const initHeadlessFlagNames = new Set([
+  "--yes",
+  "--agent",
+  "--plugin",
+  "--github-repo",
+  "--github-username",
+  "--github-owned",
+  "--github-public-owned",
+  "--github-public-starred",
+  "--github-authored-external",
+  "--install-service",
+  "--no-install-service",
+  "--start-daemon",
+]);
+
+function hasRawFlag(flag) {
+  return process.argv.includes(flag);
+}
+
+function hasHeadlessInitFlags() {
+  return process.argv.some((arg) => initHeadlessFlagNames.has(arg));
+}
+
+function normalizeOptionArray(value) {
+  if (Array.isArray(value))
+    return value.flatMap((entry) => normalizeOptionArray(entry));
+  if (typeof value !== "string") return [];
+  return value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+}
+
+function initSetupContext() {
+  const { stateDir, dbPath, configPath } = getStatePaths();
+  const detection = resolveAgentDetection({ agent: null });
+  const servicePlan = getServicePlan(stateDir, CLI_ENTRY);
+  return {
+    stateDir,
+    dbExists: existsSync(dbPath),
+    configExists: existsSync(configPath),
+    detectedAgent: detection.spec
+      ? { spec: detection.spec, id: detection.detected }
+      : null,
+    serviceManager: servicePlan?.manager ?? null,
+  };
+}
+
+function initSelectionsFromOptions(options = {}) {
+  const selections = defaultInitSelections({ currentStep: "core" });
+  if (options.agent === "auto") {
+    selections.agentMode = "auto";
+    selections.customAgent = "";
+  } else if (typeof options.agent === "string" && options.agent.length > 0) {
+    selections.agentMode = "custom";
+    selections.customAgent = options.agent;
+  }
+
+  const githubRepos = normalizeOptionArray(options.githubRepo);
+  const hasGithubScopeFlag =
+    githubRepos.length > 0 ||
+    Boolean(options.githubOwned) ||
+    Boolean(options.githubPublicOwned) ||
+    Boolean(options.githubPublicStarred) ||
+    Boolean(options.githubAuthoredExternal);
+
+  if (options.plugin === "github" || hasGithubScopeFlag) {
+    selections.source = "github";
+  } else if (options.plugin === "skip" || options.plugin === "none") {
+    selections.source = "skip";
+  } else if (typeof options.plugin === "string" && options.plugin.length > 0) {
+    selections.source = options.plugin;
+  }
+
+  if (githubRepos.length > 0) {
+    selections.githubScope = "explicit";
+    selections.githubRepos = githubRepos;
+    selections.githubRepoInput = githubRepos.join(", ");
+  } else if (options.githubOwned) {
+    selections.githubScope = "owned";
+  } else if (options.githubPublicOwned) {
+    selections.githubScope = "public_owned";
+  } else if (options.githubPublicStarred) {
+    selections.githubScope = "public_starred";
+  } else if (options.githubAuthoredExternal) {
+    selections.githubScope = "authored_external";
+  }
+
+  if (typeof options.githubUsername === "string") {
+    selections.githubUsername = options.githubUsername;
+  }
+
+  if (hasRawFlag("--no-install-service")) {
+    selections.installService = false;
+    selections.startDaemon = false;
+  } else if (hasRawFlag("--install-service")) {
+    selections.installService = true;
+    selections.startDaemon = true;
+  }
+  if (options.startDaemon) {
+    selections.startDaemon = true;
+  }
+  return selections;
+}
+
+async function applyInitSelections(selections, context, mode) {
+  const errors = validateInitSelections(selections);
+  if (errors.length > 0) {
+    failUsage(errors.join("\n"));
+    return;
+  }
+  const plan = buildInitApplyPlan(selections, context);
+  const result = await applyInitPlan(plan, {
+    bundledPluginPaths,
+    cliEntry: CLI_ENTRY,
+  });
+  result.mode = mode;
+  if (plan.firstRun.syncNow) {
+    const pid = daemonPid();
+    result.first_sync = pid
+      ? (await requestDaemonSync())
+        ? "requested"
+        : "daemon_unreachable"
+      : "daemon_not_running";
+  }
+  out(result);
+}
+
 program
   .command("init")
   .description("Initialize the local state directory and database")
-  .action(() => {
-    const stateDir = ensureStateDir();
-    const { dbPath } = getStatePaths();
-    const db = createDatabase(dbPath);
-    seedRetentionPolicy(db);
-    db.close();
-    if (!existsSync(getStatePaths().configPath)) {
-      saveConfig(loadConfig());
+  .option("--yes", "apply setup defaults without opening the wizard")
+  .option("--wizard", "force the interactive setup wizard")
+  .option("--agent <target>", "auto or an explicit acp:<target>")
+  .option("--plugin <plugin>", "github or skip")
+  .option("--github-repo <repo...>", "GitHub owner/repo to sync")
+  .option("--github-username <login>", "GitHub login for discovered scopes")
+  .option("--github-owned", "sync repositories owned by the GitHub user")
+  .option("--github-public-owned", "sync public repositories owned by the user")
+  .option(
+    "--github-public-starred",
+    "sync public owned repositories that the user has starred",
+  )
+  .option(
+    "--github-authored-external",
+    "sync issues and pull requests authored outside configured repositories",
+  )
+  .option("--install-service", "install the managed daemon login service")
+  .option("--no-install-service", "skip the managed daemon login service")
+  .option(
+    "--start-daemon",
+    "start a detached daemon without installing a service",
+  )
+  .action(async (options) => {
+    const tty = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+    if (options.wizard && !tty) {
+      return failUsage("--wizard requires an interactive terminal");
     }
+
+    const context = initSetupContext();
+    const wantsWizard =
+      options.wizard || (tty && !options.yes && !hasHeadlessInitFlags());
+    if (wantsWizard) {
+      const { launchInitWizardTui } = await import("../setup/init-app.js");
+      const selections = await launchInitWizardTui({ context });
+      if (!selections) {
+        return out({ status: "cancelled" });
+      }
+      return applyInitSelections(selections, context, "wizard");
+    }
+
+    if (options.yes || hasHeadlessInitFlags()) {
+      const selections = initSelectionsFromOptions(options);
+      return applyInitSelections(selections, context, "headless");
+    }
+
+    const { stateDir } = initializeCoreState();
     out({ status: "initialized", state_dir: stateDir });
   });
 

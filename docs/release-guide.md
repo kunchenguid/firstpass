@@ -69,7 +69,7 @@ firstpass plugin doctor
 Install a bundled plugin:
 
 ```sh
-firstpass plugin add <mock|github|gmail>
+firstpass plugin add <github|gmail>
 ```
 
 `firstpass plugin doctor` health-checks installed plugins.
@@ -121,13 +121,13 @@ Hosted model targets should be treated as data-sharing boundaries because prompt
 Use `firstpass status` to verify the currently configured ACP target before running triage.
 For sensitive sources, use a local ACP target or avoid running triage for plugins whose source content should not enter prompts.
 
-Accepted ACP target config values are either `agent: null`, a named registry target such as `agent: acp:mock-agent`, or a raw ACP server command string after `acp:`.
+Accepted ACP target config values are either `agent: null`, a named registry target such as `agent: acp:claude`, or a raw ACP server command string after `acp:`.
 Status output shows the configured ACP target, including raw custom command strings.
 Avoid secrets in custom ACP commands; use environment variables or external credential stores instead.
 
 ## First GitHub Workflow
 
-GitHub and mock are the only required MVP source paths.
+GitHub is the required production source path for this release.
 The bundled Gmail plugin, if present, is fixture-backed or demo-only for this release and should not be used as evidence of production Gmail readiness.
 
 The first GitHub workflow is intentionally approval-first.
