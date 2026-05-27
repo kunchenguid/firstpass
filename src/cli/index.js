@@ -355,11 +355,11 @@ program
     "--github-authored-external",
     "sync issues and pull requests authored outside configured repositories",
   )
-  .option("--install-service", "install the managed daemon login service")
-  .option("--no-install-service", "skip the managed daemon login service")
+  .option("--install-service", "start now and launch at login")
+  .option("--no-install-service", "do not start in the background yet")
   .option(
     "--start-daemon",
-    "start a detached daemon without installing a service",
+    "start now for this session only",
   )
   .action(async (options) => {
     const tty = Boolean(process.stdin.isTTY && process.stdout.isTTY);
