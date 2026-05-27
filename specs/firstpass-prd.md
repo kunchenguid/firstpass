@@ -94,7 +94,7 @@ Gmail is deferred from the MVP and any bundled Gmail plugin should be treated as
 | Local daemon polling configured plugin accounts.                                  | Hosted sync service.                 | First-party X plugin if API access is viable.                      |
 | SQLite database under `~/.firstpass`.                                             | Mobile app.                          | Attachment summarization pipeline.                                 |
 | Commander CLI and Ink terminal inbox UI.                                          | Team inboxes.                        | Source-specific prompt packs.                                      |
-| Plugin discovery, manifest validation, and source-scope disclosure.              | Webhook server.                      | Per-source and per-account policies.                               |
+| Plugin discovery, manifest validation, and manifest metadata persistence.        | Webhook server.                      | Per-source and per-account policies.                               |
 | Source plugin CLI protocol over JSON stdin/stdout.                                | Cross-device sync.                   | Approval receipts and action audit export.                         |
 | Item sync with plugin-owned cursors and explicit pagination/error semantics.      | Fully autonomous sending.            | Plugin sandboxing, signing, and permission enforcement.            |
 | Agent recommendation generation using plugin context and action schemas.          | Plugin marketplace.                  | Import/export of local state.                                      |
@@ -269,9 +269,9 @@ Executable plugins are not a hard security boundary.
 A plugin can read local files, make network calls, and perform source-side writes with any credentials it can access, including during commands that are nominally read-only.
 The approval boundary protects users from agent-selected actions executed by honest plugins; it does not protect users from malicious or compromised plugin code.
 
-MVP must make that tradeoff visible instead of pretending it is solved by the protocol.
-This is disclosure and consent, not sandbox enforcement.
-Plugin manifests record the plugin binary path, resolved version, manifest publisher, requested source scopes, declared capabilities, action safety levels, and install source so users can understand what a plugin can access and do.
+MVP must document that tradeoff instead of pretending it is solved by the protocol.
+This is not sandbox enforcement.
+Plugin manifests persist the plugin binary path, resolved version, manifest publisher, requested source scopes, declared capabilities, action safety levels, and install source.
 First-party plugins can be marked as bundled or verified, but their manifests still include source scopes and write-capable actions.
 
 The product should educate users to prefer the narrowest practical source credentials, inspect OAuth scopes before authorizing a plugin, avoid untrusted third-party plugins for sensitive accounts, and disable write scopes if they only want read-only recommendations.
@@ -624,7 +624,7 @@ Users should be able to inspect one recommendation and see the exact prompt cont
 | Email privacy expectations are much higher than GitHub issue privacy.                | Add context retention settings from the beginning and prefer drafts over sends.                                                                                                           |
 | X API access may be too expensive or unstable for a first-party plugin.              | Support read-only mode and treat X as V1 only if viable.                                                                                                                                  |
 | Source rate limits may make frequent polling impractical.                            | Prefer plugin-rendered prompt context over raw full history; keep polling as the required sync path and add an optional webhook bridge later.                                             |
-| Plugin security is weaker than a sandboxed permission model.                         | Add source-scope disclosure, document credential risks clearly, install only trusted plugins, and explore sandboxing, signed plugins, and permission prompts later.                     |
+| Plugin security is weaker than a sandboxed permission model.                         | Persist manifest metadata, document credential risks clearly, install only trusted plugins, and explore sandboxing, signed plugins, and permission prompts later.                       |
 | Prompt context can become too large for long email threads or large PRs.             | Prefer plugin-rendered prompt context over raw full history.                                                                                                                              |
 | Prompt context can leave the machine through hosted ACP targets.                     | Show ACP target disclosure during setup, persist prompt retention controls, and let sensitive accounts disable agent processing.                                                          |
 | Cross-source prioritization may require user-specific policy that is hard to infer.  | Keep MVP sorting simple and deterministic: plugin urgency hint, snooze expiry, recency, then source-account order.                                                                        |
@@ -713,7 +713,7 @@ Phase 4: Trust, privacy, and retention
 - [x] Implement retention cleanup jobs and e2e coverage for expiration without deleting required audit history.
 - [x] Add ACP target disclosure, hosted-model warning copy, and per-source disablement of agent processing.
 - [x] Add raw ACP command redaction across logs, errors, status output, and e2e assertions.
-- [x] Add plugin source-scope disclosure for publisher, version, requested scopes, capabilities, and action catalog metadata.
+- [x] Persist plugin manifest metadata for publisher, version, requested scopes, capabilities, and action catalog metadata.
 - [x] Add user-facing plugin author documentation for manifests, protocol commands, trust metadata, scopes, and safety levels.
 - [x] Add export/import for local state, plugin manifests, source config without secrets, retention policies, and audit history.
 
