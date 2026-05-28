@@ -33,6 +33,10 @@ describe("core/scheduler: syncRetryDelayMs", () => {
     expect(syncRetryDelayMs(1, 90)).toBe(90_000);
   });
 
+  it("caps plugin-supplied retry_after_seconds", () => {
+    expect(syncRetryDelayMs(1, 24 * 60 * 60)).toBe(SYNC_BACKOFF_CAP_MS);
+  });
+
   it("falls back to capped exponential backoff by failure count", () => {
     expect(syncRetryDelayMs(1)).toBe(SYNC_BACKOFF_BASE_MS);
     expect(syncRetryDelayMs(2)).toBe(SYNC_BACKOFF_BASE_MS * 2);

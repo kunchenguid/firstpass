@@ -19,12 +19,12 @@ export const SYNC_BACKOFF_CAP_MS = 30 * 60_000; // 30 minutes
  *
  * @param {number} consecutiveFailures - the failure streak AFTER this failure (>= 1)
  * @param {number} [retryAfterSeconds] - source-supplied hint (e.g. a rate-limit
- *   Retry-After); used verbatim when positive, otherwise we fall back to backoff.
+ *   Retry-After); honored when positive up to the sync backoff cap.
  * @returns {number} delay in milliseconds
  */
 export function syncRetryDelayMs(consecutiveFailures, retryAfterSeconds) {
   if (typeof retryAfterSeconds === "number" && retryAfterSeconds > 0) {
-    return Math.round(retryAfterSeconds * 1000);
+    return Math.min(Math.round(retryAfterSeconds * 1000), SYNC_BACKOFF_CAP_MS);
   }
   const n = Math.max(1, consecutiveFailures);
   return Math.min(SYNC_BACKOFF_BASE_MS * 2 ** (n - 1), SYNC_BACKOFF_CAP_MS);
